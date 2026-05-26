@@ -14,4 +14,7 @@ email-validator
 passlib[bcrypt]
 
 python-jose[cryptography]
-python-multipart
+python-multipart 
+
+passlib[bcrypt]==1.7.4
+bcrypt==3.2.2
