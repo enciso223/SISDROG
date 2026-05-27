@@ -1,0 +1,42 @@
+services:
+
+  backend:
+    build: ./backend
+    container_name: pharmacy_backend 
+    
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - ./backend:/app
+
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=pharmacy_db
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/pharmacy_db
+
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16
+    container_name: pharmacy_db
+    restart: always
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pharmacy_db
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
