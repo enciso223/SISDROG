@@ -13,8 +13,19 @@ export default function Ventas() {
 
     try {
       // Esta es la ruta exacta que coincidirá con tu backend
-      const response = await apiClient.get(`/inventory/products/search?q=${searchQuery}`);
-      const products = response.data; 
+      const response = await apiClient.get(`/inventory/products/search?q=${encodeURIComponent(searchQuery)}`);
+      console.log('Search response:', response);
+      // Asegurar que `products` sea siempre un array
+      let products = [];
+      if (Array.isArray(response.data)) {
+        products = response.data;
+      } else if (Array.isArray(response.data?.products)) {
+        products = response.data.products;
+      } else if (response.data && typeof response.data === 'object') {
+        // Si el backend devolviera un solo producto como objeto, convertirlo a array
+        products = [response.data];
+      }
+      console.log('Parsed products:', products);
       
       if (products.length === 0) {
         alert('Producto no encontrado.');
@@ -30,7 +41,8 @@ export default function Ventas() {
       addToCart(product);
       setSearchQuery(''); // Limpia el buscador
     } catch (error) {
-      alert('Error de conexión o producto no encontrado.');
+      console.error('Error buscando producto:', error);
+      alert('Error de conexión o producto no encontrado. Revisa la consola para más detalles.');
     }
   };
 
@@ -49,20 +61,25 @@ export default function Ventas() {
   };
 
   const calculateTotal = (currentCart) => {
-    const newTotal = currentCart.reduce((acc, item) => acc + (item.precio_venta * item.quantity), 0);
+      const newTotal = currentCart.reduce((acc, item) => acc + (item.sale_price * item.quantity), 0);
     setTotal(newTotal);
   };
 
   const checkout = async () => {
     try {
       // Conexión con el módulo sales (HU-01)
-      await apiClient.post('/sales/', { items: cart, total: total });
+      // Transformar el carrito al esquema esperado por el backend
+      const payload = {
+        items: cart.map(item => ({ product_id: item.id, quantity: item.quantity })),
+      };
+      await apiClient.post('/sales', payload);
       alert('Venta registrada con éxito. Inventario actualizado.');
       setCart([]);
       setTotal(0);
       setSearchQuery('');
     } catch (error) {
-      alert('Error al procesar la venta.');
+      console.error('Error al procesar la venta:', error);
+      alert('Error al procesar la venta. Revisa la consola para más detalles.');
     }
   };
 
@@ -95,10 +112,10 @@ export default function Ventas() {
           <tbody>
             {cart.map(item => (
               <tr key={item.id}>
-                <td>{item.nombre}</td>
-                <td>{item.quantity}</td>
-                <td>${item.precio_venta}</td>
-                <td>${item.precio_venta * item.quantity}</td>
+              <td>{item.name}</td>
+              <td>{item.quantity}</td>
+              <td>${item.sale_price}</td>
+              <td>${item.sale_price * item.quantity}</td>
               </tr>
             ))}
             {cart.length === 0 && (

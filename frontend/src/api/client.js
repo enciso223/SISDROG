@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// Cambia esta URL si tu backend se expone en un puerto o ruta diferente en docker-compose
+// Acceder desde el navegador en la máquina host a los puertos expuestos en docker-compose
 export const apiClient = axios.create({
   baseURL: 'http://localhost:8000', 
   headers: {
