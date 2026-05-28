@@ -1,0 +1,125 @@
+import React, { useState } from 'react';
+import { apiClient } from '../api/client';
+
+export default function Ventas() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [cart, setCart] = useState([]);
+  const [total, setTotal] = useState(0);
+
+  // Simulación de búsqueda conectada al módulo de inventario (HU-02)
+  const searchProduct = async (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    try {
+      // Esta es la ruta exacta que coincidirá con tu backend
+      const response = await apiClient.get(`/inventory/products/search?q=${searchQuery}`);
+      const products = response.data; 
+      
+      if (products.length === 0) {
+        alert('Producto no encontrado.');
+        return;
+      }
+
+      const product = products[0];
+
+      if (product.stock <= 0) {
+        alert('Stock Insuficiente: No hay unidades disponibles.');
+        return;
+      }
+      addToCart(product);
+      setSearchQuery(''); // Limpia el buscador
+    } catch (error) {
+      alert('Error de conexión o producto no encontrado.');
+    }
+  };
+
+  const addToCart = (product) => {
+    const existingItem = cart.find(item => item.id === product.id);
+    let newCart = [];
+    if (existingItem) {
+      newCart = cart.map(item => 
+        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+      );
+    } else {
+      newCart = [...cart, { ...product, quantity: 1 }];
+    }
+    setCart(newCart);
+    calculateTotal(newCart);
+  };
+
+  const calculateTotal = (currentCart) => {
+    const newTotal = currentCart.reduce((acc, item) => acc + (item.precio_venta * item.quantity), 0);
+    setTotal(newTotal);
+  };
+
+  const checkout = async () => {
+    try {
+      // Conexión con el módulo sales (HU-01)
+      await apiClient.post('/sales/', { items: cart, total: total });
+      alert('Venta registrada con éxito. Inventario actualizado.');
+      setCart([]);
+      setTotal(0);
+      setSearchQuery('');
+    } catch (error) {
+      alert('Error al procesar la venta.');
+    }
+  };
+
+  return (
+    <div className="page-container">
+      <h2>Punto de Venta</h2>
+      
+      <form onSubmit={searchProduct} className="search-container">
+        <input
+          type="text"
+          placeholder="Escanear código de barras o buscar nombre..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="search-input"
+          autoFocus
+        />
+        <button type="submit" className="btn btn-primary">Buscar</button>
+      </form>
+
+      <div className="cart-container">
+        <table className="cart-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Cantidad</th>
+              <th>Precio Unit.</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cart.map(item => (
+              <tr key={item.id}>
+                <td>{item.nombre}</td>
+                <td>{item.quantity}</td>
+                <td>${item.precio_venta}</td>
+                <td>${item.precio_venta * item.quantity}</td>
+              </tr>
+            ))}
+            {cart.length === 0 && (
+              <tr>
+                <td colSpan="4" className="empty-cart">No hay productos en la venta actual.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="checkout-section">
+        <h3>Total: ${total.toFixed(2)}</h3>
+        <button 
+          className="btn btn-success" 
+          onClick={checkout}
+          disabled={cart.length === 0}
+        >
+          Finalizar Venta
+        </button>
+      </div>
+    </div>
+  );
+}
