@@ -51,9 +51,9 @@ class ProductRepository:
         return db.query(Product).filter(Product.code == code).first()
 
     def search(self, db: Session, query: str):
-        """HU-06: buscar por nombre o código en tiempo real"""
+        """HU-06: buscar por nombre o código"""
+        # Temporalmente quitamos el filtro is_active para ver si aparecen
         return db.query(Product).filter(
-            Product.is_active == True,
             or_(
                 Product.name.ilike(f"%{query}%"),
                 Product.code.ilike(f"%{query}%")
