@@ -11,7 +11,9 @@ services:
 
   # --- SERVICIO BACKEND ---
   backend:
-    build: ./backend
+    build: ./backend 
+    env_file:
+    - .env
     container_name: pharmacy_backend 
     ports:
       - "8000:8000"
