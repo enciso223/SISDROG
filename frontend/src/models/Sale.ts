@@ -37,3 +37,14 @@ export interface SaleCreate {
   items: Omit<SaleItem, 'id' | 'productName' | 'subtotal'>[];
   paymentMethod: PaymentMethod;
 }
+
+export interface SaleReceipt {
+  id: number;
+  sale_id: number;
+  receipt_number: string;
+  establishment_name?: string;
+  establishment_address?: string;
+  establishment_phone?: string;
+  created_at: string;
+  sale: Sale;
+}

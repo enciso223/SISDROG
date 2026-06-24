@@ -3,7 +3,7 @@
  */
 
 import apiClient from './api';
-import {Sale, SaleCreate} from '../models';
+import {Sale, SaleCreate, SaleReceipt} from '../models';
 
 interface SaleItemBackend {
   id: number;
@@ -62,6 +62,11 @@ class SalesService {
 
     const response = await apiClient.post<SaleBackend>('/sales', payload);
     return mapToSale(response.data);
+  }
+
+  async getReceipt(saleId: number): Promise<SaleReceipt> {
+    const response = await apiClient.get<SaleReceipt>(`/sales/${saleId}/receipt`);
+    return response.data;
   }
 }
 

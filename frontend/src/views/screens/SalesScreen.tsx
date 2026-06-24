@@ -18,9 +18,9 @@ import {
   UIManager,
 } from 'react-native';
 import {usePOSController} from '../../controllers';
-import {Product} from '../../models';
+import {Product, Sale} from '../../models';
 import {TAX_RATE} from '../../config/constants';
-import {Icon} from '../components';
+import {Icon, ReceiptModal} from '../components';
 import {salesStyles as styles, PRIMARY} from './SalesScreen.styles';
 
 // Habilitar LayoutAnimation en Android (por si se ejecuta allí alguna vez)
@@ -224,6 +224,10 @@ export const SalesScreen: React.FC = () => {
   const [editingDiscount, setEditingDiscount] = useState(false);
   const [discountInput, setDiscountInput] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(true);
+  
+  const [lastSaleId, setLastSaleId] = useState<number | null>(null);
+  const [demoSale, setDemoSale] = useState<Sale | null>(null);
+  const [isReceiptVisible, setIsReceiptVisible] = useState(false);
 
   // Wrappers con animación
   const addToCart = (p: Product) => {
@@ -276,12 +280,18 @@ export const SalesScreen: React.FC = () => {
     }
     setIsProcessing(true);
     try {
-      await finalizeSale();
-      Alert.alert(
-        'Venta finalizada',
-        'La venta se registró correctamente y el stock fue actualizado.',
-      );
-      clearCart();
+      const sale = await finalizeSale();
+      if (sale) {
+        setLastSaleId(sale.id ?? null);
+        setDemoSale(sale);
+        setIsReceiptVisible(true);
+      } else {
+        clearCart();
+        Alert.alert(
+          'Venta finalizada',
+          'La venta se registró correctamente.',
+        );
+      }
     } catch (err) {
       Alert.alert(
         'Error',
@@ -543,6 +553,17 @@ export const SalesScreen: React.FC = () => {
           </View>
         </View>
       )}
+
+      {/* ─── Modal de Comprobante ─── */}
+      <ReceiptModal
+        visible={isReceiptVisible}
+        saleId={lastSaleId}
+        demoSale={demoSale}
+        onClose={() => {
+          setIsReceiptVisible(false);
+          clearCart();
+        }}
+      />
     </View>
   );
 };

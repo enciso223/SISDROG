@@ -29,7 +29,7 @@ export interface UsePOSControllerReturn {
   removeFromCart: (productId: number) => void;
   applyDiscount: (amount: number) => void;
   clearCart: () => void;
-  finalizeSale: (paymentMethod?: PaymentMethod) => Promise<void>;
+  finalizeSale: (paymentMethod?: PaymentMethod) => Promise<Sale | undefined>;
 }
 
 const ALL_CATEGORY = 'Todos';
@@ -175,7 +175,7 @@ export const usePOSController = (): UsePOSControllerReturn => {
   const finalizeSale = useCallback(
     async (
       paymentMethod: PaymentMethod = PaymentMethod.CASH,
-    ): Promise<void> => {
+    ): Promise<Sale | undefined> => {
       if (cart.length === 0) {
         throw new Error('El carrito está vacío');
       }
@@ -191,13 +191,31 @@ export const usePOSController = (): UsePOSControllerReturn => {
 
       if (DEMO_MODE) {
         clearCart();
-        return;
+        return {
+          id: 999,
+          items: cart.map(item => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            subtotal: item.subtotal,
+            productName: item.productName
+          })),
+          subtotal,
+          tax,
+          total,
+          createdAt: new Date().toISOString()
+        };
       }
 
-      await salesService.create(saleData);
+      const sale = await salesService.create(saleData);
+      // We don't clearCart here anymore, we'll clear it after the receipt is closed.
+      // But wait, if we return it, the screen can handle clearCart.
+      // Let's remove clearCart() from here so the receipt can still see the cart if needed,
+      // or we can clear it. Actually, `sale` has all info, so we can clearCart.
       clearCart();
+      return sale;
     },
-    [cart, clearCart],
+    [cart, clearCart, subtotal, tax, total],
   );
 
   return {

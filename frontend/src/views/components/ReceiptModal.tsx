@@ -1,0 +1,353 @@
+import React, {useEffect, useState} from 'react';
+import {
+  Modal,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  ScrollView,
+} from 'react-native';
+import {salesService} from '../../services';
+import {SaleReceipt, Sale} from '../../models';
+import {DEMO_MODE} from '../../config/constants';
+import {Icon} from './Icon';
+
+interface ReceiptModalProps {
+  visible: boolean;
+  saleId: number | null;
+  demoSale: Sale | null;
+  onClose: () => void;
+}
+
+export const ReceiptModal: React.FC<ReceiptModalProps> = ({
+  visible,
+  saleId,
+  demoSale,
+  onClose,
+}) => {
+  const [receipt, setReceipt] = useState<SaleReceipt | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchReceipt = async () => {
+      if (!saleId) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        if (DEMO_MODE && saleId === 999 && demoSale) {
+          // Mock receipt for demo mode
+          const mockReceipt: SaleReceipt = {
+            id: 1,
+            sale_id: 999,
+            receipt_number: 'REC-000999',
+            establishment_name: 'Farmacia Demo',
+            establishment_address: 'Calle Falsa 123',
+            establishment_phone: '555-0123',
+            created_at: new Date().toISOString(),
+            sale: demoSale,
+          };
+          setReceipt(mockReceipt);
+        } else {
+          const data = await salesService.getReceipt(saleId);
+          setReceipt(data);
+        }
+      } catch (err) {
+        setError('No se pudo cargar el comprobante.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (visible && saleId) {
+      fetchReceipt();
+    } else {
+      setReceipt(null);
+      setError(null);
+    }
+  }, [visible, saleId, demoSale]);
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent={true}
+      onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <View style={styles.modalContainer}>
+          {loading ? (
+            <View style={styles.centerContent}>
+              <ActivityIndicator size="large" color="#3B82F6" />
+              <Text style={styles.loadingText}>Generando comprobante...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.centerContent}>
+              <Icon name="error" size={48} color="#EF4444" />
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                <Text style={styles.closeButtonText}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
+          ) : receipt ? (
+            <View style={styles.receiptContainer}>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Header del Ticket */}
+                <View style={styles.ticketHeader}>
+                  <Icon name="inventory" size={40} color="#374151" />
+                  <Text style={styles.establishmentName}>
+                    {receipt.establishment_name || 'SISDROG'}
+                  </Text>
+                  {receipt.establishment_address && (
+                    <Text style={styles.establishmentInfo}>
+                      {receipt.establishment_address}
+                    </Text>
+                  )}
+                  {receipt.establishment_phone && (
+                    <Text style={styles.establishmentInfo}>
+                      Tel: {receipt.establishment_phone}
+                    </Text>
+                  )}
+                </View>
+
+                <View style={styles.divider} />
+
+                {/* Info de la Venta */}
+                <View style={styles.saleInfo}>
+                  <Text style={styles.infoText}>
+                    <Text style={styles.infoLabel}>Comprobante: </Text>
+                    {receipt.receipt_number}
+                  </Text>
+                  <Text style={styles.infoText}>
+                    <Text style={styles.infoLabel}>Fecha: </Text>
+                    {formatDate(receipt.created_at)}
+                  </Text>
+                </View>
+
+                <View style={styles.dividerDashed} />
+
+                {/* Productos */}
+                <View style={styles.productsList}>
+                  <View style={styles.tableHeader}>
+                    <Text style={[styles.tableHeaderText, {flex: 2}]}>CANT</Text>
+                    <Text style={[styles.tableHeaderText, {flex: 4}]}>DESCRIPCIÓN</Text>
+                    <Text style={[styles.tableHeaderText, {flex: 3, textAlign: 'right'}]}>IMPORTE</Text>
+                  </View>
+                  {receipt.sale.items.map((item, idx) => (
+                    <View key={idx} style={styles.tableRow}>
+                      <Text style={[styles.tableCell, {flex: 2}]}>{item.quantity}</Text>
+                      <Text style={[styles.tableCell, {flex: 4}]} numberOfLines={2}>
+                        {item.productName || `Prod ID: ${item.productId}`}
+                      </Text>
+                      <Text style={[styles.tableCell, {flex: 3, textAlign: 'right'}]}>
+                        ${item.subtotal.toFixed(2)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                <View style={styles.dividerDashed} />
+
+                {/* Totales */}
+                <View style={styles.totalsContainer}>
+                  <View style={styles.totalRow}>
+                    <Text style={styles.totalLabel}>TOTAL A PAGAR</Text>
+                    <Text style={styles.totalValue}>${receipt.sale.total.toFixed(2)}</Text>
+                  </View>
+                </View>
+
+                {/* Footer */}
+                <View style={styles.ticketFooter}>
+                  <Text style={styles.footerText}>¡Gracias por su compra!</Text>
+                </View>
+              </ScrollView>
+
+              <View style={styles.actions}>
+                <TouchableOpacity style={styles.primaryButton} onPress={onClose}>
+                  <Text style={styles.primaryButtonText}>Aceptar y Cerrar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: 400,
+    maxWidth: '90%',
+    maxHeight: '90%',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    elevation: 10,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 10},
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+  },
+  centerContent: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#4B5563',
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#EF4444',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  receiptContainer: {
+    flex: 1,
+    padding: 24,
+  },
+  ticketHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  establishmentName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  establishmentInfo: {
+    fontSize: 14,
+    color: '#4B5563',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#D1D5DB',
+    marginVertical: 16,
+  },
+  dividerDashed: {
+    height: 1,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderStyle: 'dashed',
+    marginVertical: 16,
+    borderRadius: 1,
+  },
+  saleInfo: {
+    gap: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  infoLabel: {
+    fontWeight: 'bold',
+  },
+  productsList: {
+    marginTop: 8,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    paddingBottom: 8,
+    marginBottom: 8,
+  },
+  tableHeaderText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#6B7280',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 6,
+  },
+  tableCell: {
+    fontSize: 14,
+    color: '#111827',
+  },
+  totalsContainer: {
+    marginVertical: 8,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  totalLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  totalValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  ticketFooter: {
+    marginTop: 24,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontStyle: 'italic',
+  },
+  actions: {
+    marginTop: 'auto',
+    paddingTop: 16,
+  },
+  primaryButton: {
+    backgroundColor: '#3B82F6',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  closeButton: {
+    backgroundColor: '#E5E7EB',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    width: '100%',
+  },
+  closeButtonText: {
+    color: '#374151',
+    fontWeight: 'bold',
+  },
+});
