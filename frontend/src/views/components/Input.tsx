@@ -26,31 +26,33 @@ export const Input: React.FC<InputProps> = ({label, error, ...rest}) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 8,
+    marginVertical: 6,
     width: '100%',
   },
   label: {
-    marginBottom: 4,
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333333',
+    marginBottom: 6,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CCCCCC',
-    borderRadius: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: '#000000',
-    backgroundColor: '#FFFFFF',
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#0F172A',
+    backgroundColor: '#F8FAFC',
   },
   inputError: {
-    borderColor: '#DC3545',
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
   },
   errorText: {
-    marginTop: 4,
+    marginTop: 6,
     fontSize: 12,
-    color: '#DC3545',
+    color: '#EF4444',
+    fontWeight: '500',
   },
 });

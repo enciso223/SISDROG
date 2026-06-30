@@ -2,118 +2,209 @@
  * Vista: Pantalla de inventario.
  */
 
-import React, {useEffect} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   FlatList,
   ActivityIndicator,
+  TextInput,
+  TouchableOpacity,
 } from 'react-native';
-import {Button} from '../components';
 import {useInventoryController} from '../../controllers';
 import {Product} from '../../models';
+import {Icon, ProductModal} from '../components';
+import {inventoryStyles as styles, PRIMARY, TEXT_MUTED} from './InventoryScreen.styles';
 
 interface InventoryScreenProps {
-  onBack: () => void;
+  onBack?: () => void; // Optional if navigated from drawer/menu
 }
 
 export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack}) => {
-  const {products, loading, error, fetchProducts} = useInventoryController();
+  const {products, loading, error, fetchProducts, createProduct, updateProduct, deleteProduct} = useInventoryController();
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
+  const filteredProducts = products.filter(
+    p =>
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.code.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  const handleOpenModal = (product?: Product) => {
+    setEditingProduct(product || null);
+    setIsModalVisible(true);
+  };
+
+  const handleSaveProduct = async (data: any, id?: number) => {
+    if (id) {
+      await updateProduct(id, data);
+    } else {
+      await createProduct(data);
+    }
+    setIsModalVisible(false);
+  };
+
+  const handleDeleteProduct = async (id?: number) => {
+    if (id) {
+      // In a real app we would add a confirmation dialog here
+      await deleteProduct(id);
+    }
+  };
+
+  const renderStockBadge = (stock: number, minStock: number = 10) => {
+    if (stock <= 0) {
+      return (
+        <View style={[styles.stockBadge, styles.stockBadgeRed]}>
+          <Text style={styles.stockBadgeTextRed}>Agotado</Text>
+        </View>
+      );
+    }
+    if (stock <= minStock) {
+      return (
+        <View style={[styles.stockBadge, styles.stockBadgeYellow]}>
+          <Text style={styles.stockBadgeTextYellow}>{stock} (Bajo)</Text>
+        </View>
+      );
+    }
+    return (
+      <View style={[styles.stockBadge, styles.stockBadgeGreen]}>
+        <Text style={styles.stockBadgeTextGreen}>{stock} unid.</Text>
+      </View>
+    );
+  };
+
   const renderItem = ({item}: {item: Product}) => (
     <View style={styles.row}>
-      <Text style={styles.cell}>{item.code}</Text>
-      <Text style={[styles.cell, styles.name]}>{item.name}</Text>
-      <Text style={styles.cell}>{item.stock}</Text>
-      <Text style={styles.cell}>${item.salePrice.toFixed(2)}</Text>
+      <View style={styles.colCode}>
+        <Text style={styles.cellTextBold}>{item.code}</Text>
+      </View>
+      <View style={styles.colName}>
+        <Text style={styles.cellTextBold}>{item.name}</Text>
+        {item.laboratory && (
+          <Text style={styles.cellMuted}>{item.laboratory}</Text>
+        )}
+      </View>
+      <View style={styles.colCategory}>
+        <Text style={styles.cellText}>{item.category || 'Sin categoría'}</Text>
+      </View>
+      <View style={styles.colStock}>
+        {renderStockBadge(item.stock, item.minStock)}
+      </View>
+      <View style={styles.colPrice}>
+        <Text style={styles.cellTextBold}>${item.salePrice.toFixed(2)}</Text>
+      </View>
+      <View style={styles.colActions}>
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleOpenModal(item)}>
+            <Icon name="tag" size={16} color={PRIMARY} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleDeleteProduct(item.id)}>
+            <Icon name="delete" size={16} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 
   return (
     <View style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.toolbar}>
-          <Button title="Volver" variant="secondary" onPress={onBack} />
-          <Button title="Actualizar" onPress={fetchProducts} />
-        </View>
-        {loading && <ActivityIndicator size="large" color="#0078D4" />}
-        {error && <Text style={styles.errorText}>{error}</Text>}
-        <View style={styles.headerRow}>
-          <Text style={[styles.cell, styles.headerCell]}>Código</Text>
-          <Text style={[styles.cell, styles.headerCell, styles.name]}>
-            Nombre
+      {/* Header */}
+      <View style={styles.headerContainer}>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>Inventario de Productos</Text>
+          <Text style={styles.subtitle}>
+            Gestiona los productos, existencias y precios
           </Text>
-          <Text style={[styles.cell, styles.headerCell]}>Stock</Text>
-          <Text style={[styles.cell, styles.headerCell]}>Precio</Text>
         </View>
-        <FlatList
-          data={products}
-          keyExtractor={item => item.id?.toString() ?? item.code}
-          renderItem={renderItem}
-          ListEmptyComponent={
-            !loading ? (
-              <Text style={styles.empty}>No hay productos registrados.</Text>
-            ) : null
-          }
-        />
+        
+        <View style={styles.toolbar}>
+          <View style={styles.searchContainer}>
+            <Icon name="search" size={16} color={TEXT_MUTED} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar por nombre o código..."
+              placeholderTextColor={TEXT_MUTED}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+          <TouchableOpacity style={styles.addButton} onPress={() => handleOpenModal()}>
+            <Icon name="tag" size={16} color="#FFFFFF" />
+            <Text style={styles.addButtonText}>Nuevo Producto</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Tabla */}
+      <View style={styles.tableContainer}>
+        {/* Cabecera de Tabla */}
+        <View style={styles.tableHeader}>
+          <View style={styles.colCode}>
+            <Text style={styles.headerCellText}>CÓDIGO</Text>
+          </View>
+          <View style={styles.colName}>
+            <Text style={styles.headerCellText}>NOMBRE / LAB</Text>
+          </View>
+          <View style={styles.colCategory}>
+            <Text style={styles.headerCellText}>CATEGORÍA</Text>
+          </View>
+          <View style={styles.colStock}>
+            <Text style={styles.headerCellText}>STOCK</Text>
+          </View>
+          <View style={styles.colPrice}>
+            <Text style={styles.headerCellText}>PRECIO</Text>
+          </View>
+          <View style={styles.colActions}>
+            <Text style={styles.headerCellText}>ACCIONES</Text>
+          </View>
+        </View>
+
+        {/* Contenido */}
+        {loading ? (
+          <View style={styles.centerContent}>
+            <ActivityIndicator size="large" color={PRIMARY} />
+          </View>
+        ) : error ? (
+          <View style={styles.centerContent}>
+            <Icon name="close" size={32} color="#EF4444" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredProducts}
+            keyExtractor={item => item.id?.toString() ?? item.code}
+            renderItem={renderItem}
+            ListEmptyComponent={
+              <View style={styles.centerContent}>
+                <View style={styles.emptyIcon}>
+                  <Icon name="inventory" size={24} color={TEXT_MUTED} />
+                </View>
+                <Text style={styles.emptyTitle}>No hay productos</Text>
+                <Text style={styles.emptyText}>
+                  {searchQuery
+                    ? 'No se encontraron resultados para tu búsqueda.'
+                    : 'Añade tu primer producto al inventario para comenzar.'}
+                </Text>
+              </View>
+            }
+          />
+        )}
+      </View>
+      
+      {/* Modal para Crear/Editar */}
+      <ProductModal
+        visible={isModalVisible}
+        onClose={() => setIsModalVisible(false)}
+        onSave={handleSaveProduct}
+        product={editingProduct}
+      />
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  content: {
-    flex: 1,
-    padding: 24,
-  },
-  toolbar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    backgroundColor: '#E0E0E0',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
-  },
-  row: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
-  },
-  cell: {
-    flex: 1,
-    fontSize: 14,
-    color: '#333333',
-  },
-  headerCell: {
-    fontWeight: '700',
-  },
-  name: {
-    flex: 3,
-  },
-  errorText: {
-    color: '#DC3545',
-    marginVertical: 8,
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: 24,
-    color: '#666666',
-  },
-});

@@ -25,7 +25,13 @@ export type IconName =
   | 'close'
   | 'chevronLeft'
   | 'chevronRight'
-  | 'menu';
+  | 'menu'
+  | 'info'
+  | 'money'
+  | 'calendar'
+  | 'package'
+  | 'save'
+  | 'edit';
 
 const ICONS: Record<IconName, string> = {
   home: '\uE80F',
@@ -45,6 +51,12 @@ const ICONS: Record<IconName, string> = {
   chevronLeft: '\uE76B',
   chevronRight: '\uE76C',
   menu: '\uE700',
+  info: '\uE946',
+  money: '\uE8A7',
+  calendar: '\uE787',
+  package: '\uE7B8',
+  save: '\uE74E',
+  edit: '\uE70F',
 };
 
 interface IconProps {
