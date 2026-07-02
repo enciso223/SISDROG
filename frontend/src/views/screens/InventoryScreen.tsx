@@ -1,8 +1,10 @@
 /**
  * Vista: Pantalla de inventario.
+ *
+ * Incluye panel de alertas (HU-07), tabla de productos y modal CRUD.
  */
 
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -13,7 +15,7 @@ import {
 } from 'react-native';
 import {useInventoryController} from '../../controllers';
 import {Product} from '../../models';
-import {Icon, ProductModal} from '../components';
+import {Icon, ProductModal, AlertsPanel, ProductRow} from '../components';
 import {inventoryStyles as styles, PRIMARY, TEXT_MUTED} from './InventoryScreen.styles';
 
 interface InventoryScreenProps {
@@ -21,15 +23,28 @@ interface InventoryScreenProps {
 }
 
 export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack}) => {
-  const {products, loading, error, fetchProducts, createProduct, updateProduct, deleteProduct} = useInventoryController();
+  const {
+    products,
+    loading,
+    error,
+    fetchProducts,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    // HU-07: alertas
+    alerts,
+    alertsLoading,
+    fetchAlerts,
+  } = useInventoryController();
+
   const [searchQuery, setSearchQuery] = useState('');
-  
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     fetchProducts();
-  }, [fetchProducts]);
+    fetchAlerts();
+  }, [fetchProducts, fetchAlerts]);
 
   const filteredProducts = products.filter(
     p =>
@@ -42,75 +57,38 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack}) => {
     setIsModalVisible(true);
   };
 
-  const handleSaveProduct = async (data: any, id?: number) => {
-    if (id) {
-      await updateProduct(id, data);
-    } else {
-      await createProduct(data);
-    }
-    setIsModalVisible(false);
-  };
+  /** Guarda un producto y refresca las alertas automáticamente. */
+  const handleSaveProduct = useCallback(
+    async (data: any, id?: number) => {
+      if (id) {
+        await updateProduct(id, data);
+      } else {
+        await createProduct(data);
+      }
+      setIsModalVisible(false);
+      // Refrescar alertas tras modificar inventario
+      fetchAlerts();
+    },
+    [updateProduct, createProduct, fetchAlerts],
+  );
 
-  const handleDeleteProduct = async (id?: number) => {
-    if (id) {
-      // In a real app we would add a confirmation dialog here
-      await deleteProduct(id);
-    }
-  };
-
-  const renderStockBadge = (stock: number, minStock: number = 10) => {
-    if (stock <= 0) {
-      return (
-        <View style={[styles.stockBadge, styles.stockBadgeRed]}>
-          <Text style={styles.stockBadgeTextRed}>Agotado</Text>
-        </View>
-      );
-    }
-    if (stock <= minStock) {
-      return (
-        <View style={[styles.stockBadge, styles.stockBadgeYellow]}>
-          <Text style={styles.stockBadgeTextYellow}>{stock} (Bajo)</Text>
-        </View>
-      );
-    }
-    return (
-      <View style={[styles.stockBadge, styles.stockBadgeGreen]}>
-        <Text style={styles.stockBadgeTextGreen}>{stock} unid.</Text>
-      </View>
-    );
-  };
+  /** Elimina un producto y refresca las alertas automáticamente. */
+  const handleDeleteProduct = useCallback(
+    async (id?: number) => {
+      if (id) {
+        await deleteProduct(id);
+        fetchAlerts();
+      }
+    },
+    [deleteProduct, fetchAlerts],
+  );
 
   const renderItem = ({item}: {item: Product}) => (
-    <View style={styles.row}>
-      <View style={styles.colCode}>
-        <Text style={styles.cellTextBold}>{item.code}</Text>
-      </View>
-      <View style={styles.colName}>
-        <Text style={styles.cellTextBold}>{item.name}</Text>
-        {item.laboratory && (
-          <Text style={styles.cellMuted}>{item.laboratory}</Text>
-        )}
-      </View>
-      <View style={styles.colCategory}>
-        <Text style={styles.cellText}>{item.category || 'Sin categoría'}</Text>
-      </View>
-      <View style={styles.colStock}>
-        {renderStockBadge(item.stock, item.minStock)}
-      </View>
-      <View style={styles.colPrice}>
-        <Text style={styles.cellTextBold}>${item.salePrice.toFixed(2)}</Text>
-      </View>
-      <View style={styles.colActions}>
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => handleOpenModal(item)}>
-            <Icon name="tag" size={16} color={PRIMARY} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => handleDeleteProduct(item.id)}>
-            <Icon name="delete" size={16} color="#EF4444" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
+    <ProductRow
+      item={item}
+      onEdit={handleOpenModal}
+      onDelete={handleDeleteProduct}
+    />
   );
 
   return (
@@ -141,6 +119,9 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack}) => {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* HU-07: Panel de Alertas */}
+      <AlertsPanel alerts={alerts} loading={alertsLoading} />
 
       {/* Tabla */}
       <View style={styles.tableContainer}>

@@ -31,7 +31,10 @@ export type IconName =
   | 'calendar'
   | 'package'
   | 'save'
-  | 'edit';
+  | 'edit'
+  | 'warning'
+  | 'chevronDown'
+  | 'chevronUp';
 
 const ICONS: Record<IconName, string> = {
   home: '\uE80F',
@@ -57,6 +60,9 @@ const ICONS: Record<IconName, string> = {
   package: '\uE7B8',
   save: '\uE74E',
   edit: '\uE70F',
+  warning: '\uE7BA',
+  chevronDown: '\uE70D',
+  chevronUp: '\uE70E',
 };
 
 interface IconProps {

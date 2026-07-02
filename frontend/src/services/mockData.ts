@@ -3,7 +3,7 @@
  * Activa DEMO_MODE en src/config/constants.ts para usar estos mocks.
  */
 
-import {User, UserRole, Product, Sale, PaymentMethod} from '../models';
+import {User, UserRole, Product, Sale, PaymentMethod, InventoryAlertsResponse} from '../models';
 
 export const mockUser: User = {
   id: 1,
@@ -164,3 +164,24 @@ export const mockSales: Sale[] = [
     soldBy: 'Usuario Demo',
   },
 ];
+
+/** HU-07: datos mock de alertas de inventario. */
+export const mockAlerts: InventoryAlertsResponse = {
+  lowStock: [
+    // Aspirina — agotada (stock 0, minStock 10)
+    mockProducts[3],
+    // Amoxicilina — stock bajo (stock 12, minStock 10) – ajustamos para demo
+    {
+      ...mockProducts[1],
+      stock: 8,
+    },
+  ],
+  expiringSoon: [
+    // Aspirina — vence 2026-08-20
+    mockProducts[3],
+    // Ibuprofeno — vence 2026-10-15 (dentro de ~3.5 meses)
+    mockProducts[2],
+    // Amoxicilina — vence 2026-10-15
+    mockProducts[1],
+  ],
+};

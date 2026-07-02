@@ -3,7 +3,7 @@
  */
 
 import apiClient from './api';
-import {Product, ProductCreate} from '../models';
+import {Product, ProductCreate, InventoryAlertsResponse} from '../models';
 
 // Interfaz para la respuesta del backend (snake_case)
 interface ProductBackend {
@@ -71,6 +71,8 @@ class InventoryService {
       sale_price: data.salePrice,
       stock: data.stock,
       min_stock: data.minStock || 5,
+      expiry_date: data.expirationDate || null,
+      supplier_id: data.supplierId,
     };
     const response = await apiClient.post<ProductBackend>(
       '/inventory/products',
@@ -81,15 +83,16 @@ class InventoryService {
 
   async update(id: number, data: Partial<ProductCreate>): Promise<Product> {
     const payload: any = {};
-    if (data.name !== undefined) {
-      payload.name = data.name;
-    }
-    if (data.salePrice !== undefined) {
-      payload.sale_price = data.salePrice;
-    }
-    if (data.stock !== undefined) {
-      payload.stock = data.stock;
-    }
+    if (data.name !== undefined) payload.name = data.name;
+    if (data.description !== undefined) payload.description = data.description;
+    if (data.presentation !== undefined) payload.presentation = data.presentation;
+    if (data.laboratory !== undefined) payload.laboratory = data.laboratory;
+    if (data.purchasePrice !== undefined) payload.purchase_price = data.purchasePrice;
+    if (data.salePrice !== undefined) payload.sale_price = data.salePrice;
+    if (data.stock !== undefined) payload.stock = data.stock;
+    if (data.minStock !== undefined) payload.min_stock = data.minStock;
+    if (data.expirationDate !== undefined) payload.expiry_date = data.expirationDate || null;
+    if (data.supplierId !== undefined) payload.supplier_id = data.supplierId;
 
     const response = await apiClient.put<ProductBackend>(
       `/inventory/products/${id}`,
@@ -100,6 +103,20 @@ class InventoryService {
 
   async delete(id: number): Promise<void> {
     await apiClient.delete(`/inventory/products/${id}`);
+  }
+
+  /**
+   * HU-07: obtiene alertas de stock bajo y productos próximos a vencer.
+   */
+  async getAlerts(expiryDays: number = 30): Promise<InventoryAlertsResponse> {
+    const response = await apiClient.get<{
+      low_stock: ProductBackend[];
+      expiring_soon: ProductBackend[];
+    }>(`/inventory/products/alerts?expiry_days=${expiryDays}`);
+    return {
+      lowStock: response.data.low_stock.map(mapToProduct),
+      expiringSoon: response.data.expiring_soon.map(mapToProduct),
+    };
   }
 }
 

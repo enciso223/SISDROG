@@ -75,6 +75,7 @@ class ProductUpdate(BaseModel):
     sale_price: Optional[float] = None
     batch: Optional[str] = None
     expiry_date: Optional[date] = None
+    stock: Optional[int] = None
     min_stock: Optional[int] = None
     category_id: Optional[int] = None
     supplier_id: Optional[int] = None

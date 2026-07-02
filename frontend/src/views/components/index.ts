@@ -7,3 +7,5 @@ export {ReceiptModal} from './ReceiptModal';
 export {ProductModal} from './ProductModal';
 export {Icon} from './Icon';
 export type {IconName} from './Icon';
+export {AlertsPanel} from './AlertsPanel';
+export {ProductRow} from './ProductRow';
