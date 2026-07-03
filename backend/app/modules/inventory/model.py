@@ -25,6 +25,7 @@ class Supplier(Base):
     is_active = Column(Boolean, default=True)
 
     products = relationship("Product", back_populates="supplier")
+    purchases = relationship("Purchase", back_populates="supplier")
 
 
 class Product(Base):
@@ -34,14 +35,14 @@ class Product(Base):
     code = Column(String, unique=True, nullable=False, index=True)
     name = Column(String, nullable=False, index=True)
     description = Column(Text, nullable=True)
-    presentation = Column(String, nullable=True)   # tableta, jarabe, etc.
+    presentation = Column(String, nullable=True)
     laboratory = Column(String, nullable=True)
     purchase_price = Column(Float, nullable=False)
     sale_price = Column(Float, nullable=False)
-    batch = Column(String, nullable=True)           # lote
-    expiry_date = Column(Date, nullable=True)       # fecha vencimiento
+    batch = Column(String, nullable=True)
+    expiry_date = Column(Date, nullable=True)
     stock = Column(Integer, default=0)
-    min_stock = Column(Integer, default=5)          # HU-07: stock mínimo
+    min_stock = Column(Integer, default=5)
     is_active = Column(Boolean, default=True)
 
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
