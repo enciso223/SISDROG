@@ -8,6 +8,7 @@ from app.modules.inventory.model import Category, Supplier, Product
 from app.modules.sales.model import Sale, SaleItem, SaleReceipt
 from app.modules.purchases.model import Purchase, PurchaseItem
 from app.modules.expenses.model import Expense
+from app.modules.donations.model import Donation, DonationItem, ProductMovement
 
 from alembic import context
 
