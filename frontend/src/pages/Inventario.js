@@ -5,11 +5,15 @@ export default function Inventario() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [alerts, setAlerts] = useState({ low_stock: [], expiring_soon: [] });
-  
+
   const [showProductForm, setShowProductForm] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
-  
-  // Estado para el formulario de Producto (min_stock oculto y code opcional)
+
+  const [categoryError, setCategoryError] = useState('');
+  const [categorySuccess, setCategorySuccess] = useState('');
+  const [productError, setProductError] = useState('');
+  const [productSuccess, setProductSuccess] = useState('');
+
   const [newProduct, setNewProduct] = useState({
     name: '',
     purchase_price: '',
@@ -18,7 +22,6 @@ export default function Inventario() {
     category_id: ''
   });
 
-  // Estado para el formulario de Categoría
   const [newCategory, setNewCategory] = useState({
     name: '',
     description: ''
@@ -57,31 +60,45 @@ export default function Inventario() {
     }
   };
 
-  // --- CREAR CATEGORÍA ---
+  const getErrorMessage = (error) => {
+    if (error.response?.data?.detail) {
+      const detail = error.response.data.detail;
+      if (Array.isArray(detail)) {
+        return detail.map(d => `${d.loc?.slice(-1)[0] || 'campo'}: ${d.msg}`).join(', ');
+      }
+      return detail;
+    }
+    return 'Ocurrió un error inesperado. Intenta de nuevo.';
+  };
+
   const handleCreateCategory = async (e) => {
     e.preventDefault();
+    setCategoryError('');
+    setCategorySuccess('');
     try {
       await apiClient.post('/inventory/categories', newCategory);
-      alert('Categoría creada exitosamente');
+      setCategorySuccess('Categoría creada exitosamente.');
       setNewCategory({ name: '', description: '' });
-      setShowCategoryForm(false);
-      fetchCategories(); // Recargar lista para el select
+      fetchCategories();
+      setTimeout(() => {
+        setCategorySuccess('');
+        setShowCategoryForm(false);
+      }, 2000);
     } catch (error) {
-      alert('Error al crear la categoría.');
+      setCategoryError(getErrorMessage(error));
       console.error(error);
     }
   };
 
-  // --- CREAR PRODUCTO ---
   const handleCreateProduct = async (e) => {
     e.preventDefault();
+    setProductError('');
+    setProductSuccess('');
     try {
-      // Preparamos los datos para que coincidan con el esquema ProductCreate del backend
       const productData = {
         ...newProduct,
-        // Genera un código automático si el backend lo exige y el usuario no lo ingresó
-        code: `PROD-${Date.now()}`, 
-        min_stock: 5, // Se envía por defecto sin mostrarlo al usuario
+        code: `PROD-${Date.now()}`,
+        min_stock: 5,
         purchase_price: parseFloat(newProduct.purchase_price),
         sale_price: parseFloat(newProduct.sale_price),
         stock: parseInt(newProduct.stock, 10),
@@ -89,15 +106,16 @@ export default function Inventario() {
       };
 
       await apiClient.post('/inventory/products', productData);
-      alert('Producto creado exitosamente');
-      
-      setShowProductForm(false);
+      setProductSuccess('Producto creado exitosamente.');
       setNewProduct({ name: '', purchase_price: '', sale_price: '', stock: '', category_id: '' });
-      
       fetchProducts();
       fetchAlerts();
+      setTimeout(() => {
+        setProductSuccess('');
+        setShowProductForm(false);
+      }, 2000);
     } catch (error) {
-      alert('Error al crear el producto. Verifica los datos.');
+      setProductError(getErrorMessage(error));
       console.error(error);
     }
   };
@@ -107,16 +125,16 @@ export default function Inventario() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>Gestión de Inventario</h2>
         <div>
-          <button className="btn btn-primary" style={{ marginRight: '10px' }} onClick={() => setShowCategoryForm(!showCategoryForm)}>
+          <button className="btn btn-primary" style={{ marginRight: '10px' }} onClick={() => { setShowCategoryForm(!showCategoryForm); setCategoryError(''); setCategorySuccess(''); }}>
             {showCategoryForm ? 'Cerrar Categoría' : '+ Nueva Categoría'}
           </button>
-          <button className="btn btn-success" onClick={() => setShowProductForm(!showProductForm)}>
+          <button className="btn btn-success" onClick={() => { setShowProductForm(!showProductForm); setProductError(''); setProductSuccess(''); }}>
             {showProductForm ? 'Cancelar Producto' : '+ Nuevo Producto'}
           </button>
         </div>
       </div>
 
-      {/* Alertas */}
+      {/* Alertas de stock */}
       {(alerts.low_stock?.length > 0) && (
         <div style={{ backgroundColor: '#fff3cd', padding: '15px', borderRadius: '5px', margin: '20px 0', border: '1px solid #ffeeba' }}>
           <h4 style={{ color: '#856404' }}>⚠️ Alertas de Stock Bajo</h4>
@@ -126,44 +144,67 @@ export default function Inventario() {
         </div>
       )}
 
-      {/* Formulario de Creación de Categoría */}
+      {/* Formulario Categoría */}
       {showCategoryForm && (
         <form onSubmit={handleCreateCategory} style={{ background: '#e9ecef', padding: '20px', borderRadius: '8px', marginBottom: '20px', marginTop: '20px' }}>
           <h3>Crear Categoría</h3>
+
+          {categoryError && (
+            <div style={{ backgroundColor: '#f8d7da', color: '#842029', padding: '10px 15px', borderRadius: '5px', marginTop: '10px', border: '1px solid #f5c2c7' }}>
+              ❌ {categoryError}
+            </div>
+          )}
+          {categorySuccess && (
+            <div style={{ backgroundColor: '#d1e7dd', color: '#0f5132', padding: '10px 15px', borderRadius: '5px', marginTop: '10px', border: '1px solid #badbcc' }}>
+              ✅ {categorySuccess}
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: '15px', marginTop: '15px' }}>
-            <input type="text" placeholder="Nombre de la categoría" className="search-input" 
-              value={newCategory.name} onChange={e => setNewCategory({...newCategory, name: e.target.value})} required />
-            <input type="text" placeholder="Descripción (Opcional)" className="search-input" 
-              value={newCategory.description} onChange={e => setNewCategory({...newCategory, description: e.target.value})} />
+            <input type="text" placeholder="Nombre de la categoría" className="search-input"
+              value={newCategory.name} onChange={e => setNewCategory({ ...newCategory, name: e.target.value })} required />
+            <input type="text" placeholder="Descripción (Opcional)" className="search-input"
+              value={newCategory.description} onChange={e => setNewCategory({ ...newCategory, description: e.target.value })} />
             <button type="submit" className="btn btn-primary">Guardar Categoría</button>
           </div>
         </form>
       )}
 
-      {/* Formulario de Creación de Producto */}
+      {/* Formulario Producto */}
       {showProductForm && (
         <form onSubmit={handleCreateProduct} style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', marginBottom: '20px', marginTop: '20px' }}>
           <h3>Registrar Nuevo Producto</h3>
+
+          {productError && (
+            <div style={{ backgroundColor: '#f8d7da', color: '#842029', padding: '10px 15px', borderRadius: '5px', marginTop: '10px', border: '1px solid #f5c2c7' }}>
+              ❌ {productError}
+            </div>
+          )}
+          {productSuccess && (
+            <div style={{ backgroundColor: '#d1e7dd', color: '#0f5132', padding: '10px 15px', borderRadius: '5px', marginTop: '10px', border: '1px solid #badbcc' }}>
+              ✅ {productSuccess}
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '15px' }}>
-            
-            <input type="text" placeholder="Nombre del producto" className="search-input" 
-              value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} required />
-            
-            <select className="search-input" value={newProduct.category_id} onChange={e => setNewProduct({...newProduct, category_id: e.target.value})}>
+            <input type="text" placeholder="Nombre del producto" className="search-input"
+              value={newProduct.name} onChange={e => setNewProduct({ ...newProduct, name: e.target.value })} required />
+
+            <select className="search-input" value={newProduct.category_id} onChange={e => setNewProduct({ ...newProduct, category_id: e.target.value })}>
               <option value="">-- Seleccionar Categoría (Opcional) --</option>
               {categories.map(cat => (
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
 
-            <input type="number" step="0.01" placeholder="Precio de Compra" className="search-input" 
-              value={newProduct.purchase_price} onChange={e => setNewProduct({...newProduct, purchase_price: e.target.value})} required />
-            
-            <input type="number" step="0.01" placeholder="Precio de Venta" className="search-input" 
-              value={newProduct.sale_price} onChange={e => setNewProduct({...newProduct, sale_price: e.target.value})} required />
-            
-            <input type="number" placeholder="Stock Inicial" className="search-input" 
-              value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: e.target.value})} required />
+            <input type="number" step="0.01" placeholder="Precio de Compra" className="search-input"
+              value={newProduct.purchase_price} onChange={e => setNewProduct({ ...newProduct, purchase_price: e.target.value })} required />
+
+            <input type="number" step="0.01" placeholder="Precio de Venta" className="search-input"
+              value={newProduct.sale_price} onChange={e => setNewProduct({ ...newProduct, sale_price: e.target.value })} required />
+
+            <input type="number" placeholder="Stock Inicial" className="search-input"
+              value={newProduct.stock} onChange={e => setNewProduct({ ...newProduct, stock: e.target.value })} required />
           </div>
           <button type="submit" className="btn btn-success" style={{ marginTop: '15px' }}>Guardar Producto</button>
         </form>
