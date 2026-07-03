@@ -12,6 +12,9 @@ class CategoryRepository:
     def get_by_id(self, db: Session, category_id: int):
         return db.query(Category).filter(Category.id == category_id).first()
 
+    def get_by_name(self, db: Session, name: str):
+        return db.query(Category).filter(Category.name == name).first()
+
     def create(self, db: Session, category: Category):
         db.add(category)
         db.commit()
@@ -52,7 +55,6 @@ class ProductRepository:
 
     def search(self, db: Session, query: str):
         """HU-06: buscar por nombre o código"""
-        # Temporalmente quitamos el filtro is_active para ver si aparecen
         return db.query(Product).filter(
             or_(
                 Product.name.ilike(f"%{query}%"),
@@ -93,5 +95,3 @@ class ProductRepository:
         db.commit()
         db.refresh(product)
         return product
-
-
