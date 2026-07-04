@@ -2,6 +2,8 @@
  * Modelo de dominio: Producto (inventario)
  */
 
+export type ProductOrigin = 'Compra' | 'Donación' | 'Consignación';
+
 export interface Product {
   id?: number;
   code: string;
@@ -18,6 +20,7 @@ export interface Product {
   iva?: number;
   isActive?: boolean;
   supplierId?: number;
+  origin?: ProductOrigin;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -35,4 +38,5 @@ export interface ProductCreate {
   expirationDate?: string;
   iva?: number;
   supplierId?: number;
+  origin?: ProductOrigin;
 }

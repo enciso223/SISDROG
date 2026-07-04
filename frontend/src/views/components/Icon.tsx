@@ -20,6 +20,7 @@ export type IconName =
   | 'user'
   | 'scan'
   | 'tag'
+  | 'plus'
   | 'delete'
   | 'payment'
   | 'close'
@@ -34,7 +35,11 @@ export type IconName =
   | 'edit'
   | 'warning'
   | 'chevronDown'
-  | 'chevronUp';
+  | 'chevronUp'
+  | 'history'
+  | 'cart'
+  | 'gift'
+  | 'filter';
 
 const ICONS: Record<IconName, string> = {
   home: '\uE80F',
@@ -48,6 +53,7 @@ const ICONS: Record<IconName, string> = {
   user: '\uE77B',
   scan: '\uE8B0',
   tag: '\uE7C3',
+  plus: '\uE710',
   delete: '\uE74D',
   payment: '\uE719',
   close: '\uE8BB',
@@ -63,6 +69,10 @@ const ICONS: Record<IconName, string> = {
   warning: '\uE7BA',
   chevronDown: '\uE70D',
   chevronUp: '\uE70E',
+  history: '\uE81C',
+  cart: '\uE7BF',
+  gift: '\uE8EC',
+  filter: '\uE71C',
 };
 
 interface IconProps {

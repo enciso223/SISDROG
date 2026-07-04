@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import {Input} from './Input';
 import {Icon, IconName} from './Icon';
-import {Product, ProductCreate} from '../../models';
+import {Product, ProductCreate, ProductOrigin} from '../../models';
 
 interface ProductModalProps {
   visible: boolean;
@@ -61,6 +61,37 @@ const SectionCard: React.FC<{children: React.ReactNode}> = ({children}) => (
   <View style={styles.sectionCard}>{children}</View>
 );
 
+/* ─────────────────────────────────────────────────────────
+ * Utilidades de máscara para fecha de vencimiento
+ * Formato de ENTRADA/SALIDA visual: DD/MM/AAAA
+ * Formato de ALMACENAMIENTO interno: YYYY-MM-DD
+ * ───────────────────────────────────────────────────────── */
+
+/** Convierte los dígitos que el usuario va escribiendo → DD/MM/AAAA */
+const maskDate = (raw: string): string => {
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) {return digits;}
+  if (digits.length <= 4) {return `${digits.slice(0, 2)}/${digits.slice(2)}`;}
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
+/** DD/MM/AAAA → YYYY-MM-DD (para guardar en el modelo) */
+const displayToISO = (display: string): string => {
+  const parts = display.split('/');
+  if (parts.length === 3 && parts[2].length === 4) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return '';
+};
+
+/** YYYY-MM-DD → DD/MM/AAAA (para mostrar al editar) */
+const ISOToDisplay = (iso?: string): string => {
+  if (!iso) {return '';}
+  const parts = iso.split('-');
+  if (parts.length === 3) {return `${parts[2]}/${parts[1]}/${parts[0]}`;}
+  return iso;
+};
+
 export const ProductModal: React.FC<ProductModalProps> = ({
   visible,
   onClose,
@@ -69,6 +100,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 }) => {
   const [formData, setFormData] = useState<Partial<ProductCreate>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Estado visual de la fecha (DD/MM/AAAA) independiente del ISO almacenado
+  const [displayDate, setDisplayDate] = useState('');
 
   useEffect(() => {
     if (visible) {
@@ -85,7 +118,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           minStock: product.minStock || 5,
           expirationDate: product.expirationDate || '',
           supplierId: product.supplierId,
+          origin: product.origin || 'Compra',
         });
+        setDisplayDate(ISOToDisplay(product.expirationDate));
       } else {
         setFormData({
           code: '',
@@ -98,7 +133,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           stock: 0,
           minStock: 5,
           expirationDate: '',
+          origin: 'Compra',
         });
+        setDisplayDate('');
       }
       setErrors({});
     }
@@ -106,8 +143,20 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
   const handleChange = (field: keyof ProductCreate, value: string | number | undefined) => {
     setFormData(prev => ({...prev, [field]: value}));
-    if (errors[field]) {
+    if (errors[field as string]) {
       setErrors(prev => ({...prev, [field]: ''}));
+    }
+  };
+
+  /** Maneja la entrada de fecha con máscara automática DD/MM/AAAA */
+  const handleDateChange = (raw: string) => {
+    const masked = maskDate(raw);
+    setDisplayDate(masked);
+    // Solo guardamos en formData cuando el usuario ha ingresado la fecha completa
+    const iso = displayToISO(masked);
+    setFormData(prev => ({...prev, expirationDate: iso || masked}));
+    if (errors.expirationDate) {
+      setErrors(prev => ({...prev, expirationDate: ''}));
     }
   };
 
@@ -215,6 +264,32 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                   />
                 </View>
               </View>
+
+              {/* Selector de origen */}
+              <View style={{paddingHorizontal: 8, marginTop: 4, marginBottom: 8}}>
+                <Text style={[styles.sectionSubtitle, {marginBottom: 8, color: '#475569', fontWeight: '600'}]}>
+                  Tipo de Origen
+                </Text>
+                <View style={{flexDirection: 'row', gap: 8}}>
+                  {(['Compra', 'Donación', 'Consignación'] as ProductOrigin[]).map(opt => (
+                    <TouchableOpacity
+                      key={opt}
+                      onPress={() => handleChange('origin', opt)}
+                      style={[
+                        originOptionStyle,
+                        formData.origin === opt && originOptionActiveStyle,
+                      ]}>
+                      <Text
+                        style={[
+                          originOptionTextStyle,
+                          formData.origin === opt && originOptionTextActiveStyle,
+                        ]}>
+                        {opt}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
               <View style={styles.row}>
                 <View style={styles.col}>
                   <Input
@@ -320,10 +395,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 </View>
                 <View style={styles.col}>
                   <Input
-                    label="Vencimiento"
-                    placeholder="YYYY-MM-DD"
-                    value={formData.expirationDate}
-                    onChangeText={v => handleChange('expirationDate', v)}
+                    label="Fecha de Vencimiento"
+                    placeholder="DD/MM/AAAA"
+                    keyboardType="numeric"
+                    value={displayDate}
+                    onChangeText={handleDateChange}
+                    maxLength={10}
                   />
                 </View>
               </View>
@@ -609,3 +686,29 @@ const styles = StyleSheet.create({
     color: BG_SURFACE,
   },
 });
+
+/* ─── Estilos del selector de origen (fuera de StyleSheet por reuso inline) ─── */
+const originOptionStyle = {
+  paddingHorizontal: 16,
+  paddingVertical: 8,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: BORDER,
+  backgroundColor: BG_SURFACE,
+} as const;
+
+const originOptionActiveStyle = {
+  borderColor: TEAL,
+  backgroundColor: '#F0FDFA',
+} as const;
+
+const originOptionTextStyle = {
+  fontSize: 13,
+  fontWeight: '600' as const,
+  color: TEXT_SECONDARY,
+};
+
+const originOptionTextActiveStyle = {
+  color: TEAL,
+};
+
