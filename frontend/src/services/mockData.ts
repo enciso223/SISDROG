@@ -165,7 +165,7 @@ export const mockProducts: Product[] = [
     expirationDate: '2025-06-14',
     iva: 19,
     isActive: true,
-    origin: 'Consignación',
+    origin: 'Compra',
   },
   {
     id: 115,

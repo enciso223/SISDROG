@@ -2,7 +2,7 @@
  * Modelo de dominio: Producto (inventario)
  */
 
-export type ProductOrigin = 'Compra' | 'Donación' | 'Consignación';
+export type ProductOrigin = 'Compra' | 'Donación';
 
 export interface Product {
   id?: number;

@@ -33,7 +33,6 @@ const formatDate = (dateStr?: string): string => {
 /** Ícono según el origen del producto */
 const originIcon = (origin?: ProductOrigin): IconName => {
   if (origin === 'Donación') {return 'gift';}
-  if (origin === 'Consignación') {return 'tag';}
   return 'cart';
 };
 
@@ -75,7 +74,7 @@ export const ProductRow: React.FC<ProductRowProps> = ({item, onEdit, onDelete}) 
 
       {/* ID PROD. */}
       <View style={styles.colCode}>
-        <Text style={styles.cellText}>{formatProductId(item.id)}</Text>
+        <Text style={styles.cellText}>{item.code}</Text>
       </View>
 
       {/* NOMBRE DEL PRODUCTO + origen */}

@@ -174,7 +174,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack: _onBack
         {/* Cabecera */}
         <View style={styles.tableHeader}>
           <View style={styles.colCode}>
-            <Text style={styles.headerCellText}>ID PROD.</Text>
+            <Text style={styles.headerCellText}>CÓDIGO</Text>
           </View>
           <View style={styles.colName}>
             <Text style={styles.headerCellText}>NOMBRE DEL PRODUCTO</Text>

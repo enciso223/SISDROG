@@ -18,12 +18,20 @@ apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error: AxiosError) => {
     if (error.response) {
-      return Promise.reject(
-        new Error(
-          (error.response.data as {detail?: string})?.detail ||
-            `Error ${error.response.status}: ${error.message}`,
-        ),
-      );
+      const data = error.response.data as {detail?: string | Array<{msg: string; loc?: unknown[]}>};
+      let message: string;
+      if (Array.isArray(data?.detail)) {
+        // Pydantic v2 devuelve un array de errores de validación
+        message = data.detail
+          .map((e: {msg: string; loc?: unknown[]}) => {
+            const field = e.loc ? e.loc.slice(1).join(' → ') : '';
+            return field ? `${field}: ${e.msg}` : e.msg;
+          })
+          .join(' | ');
+      } else {
+        message = (data?.detail as string) || `Error ${error.response.status}: ${error.message}`;
+      }
+      return Promise.reject(new Error(message));
     }
     return Promise.reject(error);
   },

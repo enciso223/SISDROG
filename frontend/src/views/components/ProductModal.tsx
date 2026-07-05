@@ -164,12 +164,31 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     const newErrors: Record<string, string> = {};
     if (!formData.code) newErrors.code = 'Requerido';
     if (!formData.name) newErrors.name = 'Requerido';
-    if (formData.purchasePrice === undefined || formData.purchasePrice < 0)
+    if (formData.purchasePrice === undefined || formData.purchasePrice < 0) {
       newErrors.purchasePrice = 'Debe ser mayor o igual a 0';
+    } else if (formData.origin !== 'Donación' && formData.purchasePrice === 0) {
+      newErrors.purchasePrice = 'Debe ser mayor a 0 (excepto en Donación)';
+    }
     if (formData.salePrice === undefined || formData.salePrice < 0)
       newErrors.salePrice = 'Debe ser mayor o igual a 0';
     if (formData.stock === undefined || formData.stock < 0)
       newErrors.stock = 'Debe ser mayor o igual a 0';
+
+    if (formData.expirationDate) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(formData.expirationDate)) {
+        newErrors.expirationDate = 'Formato incompleto';
+      } else {
+        const parts = formData.expirationDate.split('-');
+        const month = parseInt(parts[1], 10);
+        const day = parseInt(parts[2], 10);
+        if (month < 1 || month > 12) {
+          newErrors.expirationDate = 'Mes inválido (1-12)';
+        } else if (day < 1 || day > 31) {
+          newErrors.expirationDate = 'Día inválido (1-31)';
+        }
+      }
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -271,7 +290,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                   Tipo de Origen
                 </Text>
                 <View style={{flexDirection: 'row', gap: 8}}>
-                  {(['Compra', 'Donación', 'Consignación'] as ProductOrigin[]).map(opt => (
+                  {(['Compra', 'Donación'] as ProductOrigin[]).map(opt => (
                     <TouchableOpacity
                       key={opt}
                       onPress={() => handleChange('origin', opt)}
@@ -401,6 +420,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                     value={displayDate}
                     onChangeText={handleDateChange}
                     maxLength={10}
+                    error={errors.expirationDate}
                   />
                 </View>
               </View>
