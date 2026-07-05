@@ -23,6 +23,8 @@ export interface UsePOSControllerReturn {
   discount: number;
   total: number;
   filteredProducts: Product[];
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
   setSelectedCategory: (category: string) => void;
   addToCart: (product: Product) => void;
   updateQuantity: (productId: number, quantity: number) => void;
@@ -38,7 +40,7 @@ export const usePOSController = (): UsePOSControllerReturn => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, _setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
@@ -230,6 +232,8 @@ export const usePOSController = (): UsePOSControllerReturn => {
     discount,
     total,
     filteredProducts,
+    searchQuery,
+    setSearchQuery,
     setSelectedCategory,
     addToCart,
     updateQuantity,

@@ -6,7 +6,7 @@ export const API_BASE_URL = 'http://localhost:8000';
 
 export const API_TIMEOUT = 10000;
 
-export const TAX_RATE = 0.12;
+export const TAX_RATE = 0;
 
 /**
  * Modo demo: cuando es true, los controladores usan datos mock

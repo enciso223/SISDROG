@@ -1,12 +1,12 @@
 import React, {useEffect, useState} from 'react';
 import {
-  Modal,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import {salesService} from '../../services';
 import {SaleReceipt, Sale} from '../../models';
@@ -85,12 +85,19 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     }
   };
 
+  const formatCurrency = (amount: number | string | undefined) => {
+    if (amount == null) return '$0.00';
+    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+    // Separa los miles con punto y los decimales con coma (opcional, aquí no mostramos decimales si son 0)
+    const intPart = Math.floor(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return `$${intPart}`;
+  };
+
+
+  if (!visible) return null;
+
   return (
-    <Modal
-      visible={visible}
-      animationType="fade"
-      transparent={true}
-      onRequestClose={onClose}>
+    <View style={[StyleSheet.absoluteFill, {zIndex: 1000, elevation: 1000}]}>
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
           {loading ? (
@@ -150,17 +157,21 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                     <Text style={[styles.tableHeaderText, {flex: 4}]}>DESCRIPCIÓN</Text>
                     <Text style={[styles.tableHeaderText, {flex: 3, textAlign: 'right'}]}>IMPORTE</Text>
                   </View>
-                  {receipt.sale.items.map((item, idx) => (
-                    <View key={idx} style={styles.tableRow}>
-                      <Text style={[styles.tableCell, {flex: 2}]}>{item.quantity}</Text>
-                      <Text style={[styles.tableCell, {flex: 4}]} numberOfLines={2}>
-                        {item.productName || `Prod ID: ${item.productId}`}
-                      </Text>
-                      <Text style={[styles.tableCell, {flex: 3, textAlign: 'right'}]}>
-                        ${item.subtotal.toFixed(2)}
-                      </Text>
-                    </View>
-                  ))}
+                  {receipt.sale.items.map((item: any, idx) => {
+                    const name = item.productName || item.product_name || `Prod ID: ${item.productId || item.product_id || 'Desconocido'}`;
+                    const subtotal = item.subtotal || item.sub_total || 0;
+                    return (
+                      <View key={idx} style={styles.tableRow}>
+                        <Text style={[styles.tableCell, {flex: 2}]}>{item.quantity}</Text>
+                        <Text style={[styles.tableCell, {flex: 4}]} numberOfLines={2}>
+                          {name}
+                        </Text>
+                        <Text style={[styles.tableCell, {flex: 3, textAlign: 'right'}]}>
+                          {formatCurrency(subtotal)}
+                        </Text>
+                      </View>
+                    );
+                  })}
                 </View>
 
                 <View style={styles.dividerDashed} />
@@ -169,7 +180,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                 <View style={styles.totalsContainer}>
                   <View style={styles.totalRow}>
                     <Text style={styles.totalLabel}>TOTAL A PAGAR</Text>
-                    <Text style={styles.totalValue}>${receipt.sale.total.toFixed(2)}</Text>
+                    <Text style={styles.totalValue}>{formatCurrency(receipt.sale.total)}</Text>
                   </View>
                 </View>
 
@@ -188,7 +199,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           ) : null}
         </View>
       </View>
-    </Modal>
+    </View>
   );
 };
 
@@ -202,7 +213,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: 400,
     maxWidth: '90%',
-    maxHeight: '90%',
+    height: Math.round(Dimensions.get('window').height * 0.85),
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
     elevation: 10,

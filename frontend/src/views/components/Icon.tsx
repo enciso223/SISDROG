@@ -39,7 +39,8 @@ export type IconName =
   | 'history'
   | 'cart'
   | 'gift'
-  | 'filter';
+  | 'filter'
+  | 'cash';
 
 const ICONS: Record<IconName, string> = {
   home: '\uE80F',
@@ -73,6 +74,7 @@ const ICONS: Record<IconName, string> = {
   cart: '\uE7BF',
   gift: '\uE8EC',
   filter: '\uE71C',
+  cash: '\uE825',
 };
 
 interface IconProps {

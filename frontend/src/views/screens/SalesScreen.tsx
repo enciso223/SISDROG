@@ -16,11 +16,13 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  Image,
 } from 'react-native';
 import {usePOSController} from '../../controllers';
 import {Product, Sale} from '../../models';
 import {TAX_RATE} from '../../config/constants';
 import {Icon, ReceiptModal} from '../components';
+import {PAYMENT_ICON} from '../../assets/paymentIcon';
 import {salesStyles as styles, PRIMARY} from './SalesScreen.styles';
 
 // Habilitar LayoutAnimation en Android (por si se ejecuta allí alguna vez)
@@ -90,14 +92,23 @@ const CategoryChip: React.FC<CategoryChipProps> = ({
   </Pressable>
 );
 
+const formatCurrency = (amount: number | string | undefined) => {
+  if (amount == null) return '$0.00';
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  const intPart = Math.floor(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `$${intPart}`;
+};
+
 interface ProductCardProps {
   product: Product;
+  quantityInCart: number;
   onPress: (product: Product) => void;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({product, onPress}) => {
-  const outOfStock = product.stock <= 0;
-  const lowStock = !outOfStock && product.stock <= (product.minStock ?? 0);
+const ProductCard: React.FC<ProductCardProps> = ({product, quantityInCart, onPress}) => {
+  const currentStock = product.stock - quantityInCart;
+  const outOfStock = currentStock <= 0;
+  const lowStock = !outOfStock && currentStock <= (product.minStock ?? 0);
 
   const stockBadgeColor = outOfStock
     ? styles.badgeRed
@@ -110,6 +121,35 @@ const ProductCard: React.FC<ProductCardProps> = ({product, onPress}) => {
     ? styles.badgeTextYellow
     : styles.badgeTextGreen;
 
+  // Fecha de vencimiento y alerta
+  let expirationAlert = null;
+  let isExpired = false;
+  let isExpiringSoon = false;
+  
+  if (product.expirationDate) {
+    // Convertir de formato YYYY-MM-DD o YYYY/MM/DD
+    const expDate = new Date(product.expirationDate);
+    expDate.setHours(0,0,0,0);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const diffTime = expDate.getTime() - today.getTime();
+    const daysToExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // Formatear fecha para Colombia (DD/MM/YYYY)
+    const [year, month, day] = product.expirationDate.split('-');
+    const formattedDate = day && month && year ? `${day}/${month}/${year}` : product.expirationDate;
+
+    if (daysToExpiry < 0) {
+      isExpired = true;
+      expirationAlert = `Vencido (${formattedDate})`;
+    } else if (daysToExpiry <= 30) {
+      isExpiringSoon = true;
+      expirationAlert = `Vence pronto (${formattedDate})`;
+    } else {
+      expirationAlert = `Vence: ${formattedDate}`;
+    }
+  }
+
   return (
     <Pressable
       style={({pressed}) => [
@@ -121,11 +161,11 @@ const ProductCard: React.FC<ProductCardProps> = ({product, onPress}) => {
       disabled={outOfStock}>
       <View style={styles.productCardHeader}>
         <View style={styles.productIconPlaceholder}>
-          <Icon name="inventory" size={22} color={PRIMARY} />
+          <Icon name="cart" size={22} color={PRIMARY} />
         </View>
         <View style={[styles.stockBadge, stockBadgeColor]}>
           <Text style={stockTextColor}>
-            {outOfStock ? 'Sin Stock' : `Stock: ${product.stock}`}
+            {outOfStock ? 'Sin Stock' : `Stock: ${currentStock}`}
           </Text>
         </View>
       </View>
@@ -137,10 +177,20 @@ const ProductCard: React.FC<ProductCardProps> = ({product, onPress}) => {
         <Text style={styles.productLab} numberOfLines={1}>
           {product.laboratory ?? 'Genérico'}
         </Text>
+        {expirationAlert && (
+          <Text 
+            style={[
+              styles.productLab, 
+              isExpired ? {color: '#EF4444', fontWeight: 'bold'} : isExpiringSoon ? {color: '#F59E0B', fontWeight: 'bold'} : null
+            ]} 
+            numberOfLines={1}>
+            {expirationAlert}
+          </Text>
+        )}
       </View>
 
       <View style={styles.productFooter}>
-        <Text style={styles.productPrice}>${product.salePrice.toFixed(2)}</Text>
+        <Text style={styles.productPrice}>{formatCurrency(product.salePrice)}</Text>
         <View style={styles.addButton}>
           <Text style={styles.addButtonText}>+</Text>
         </View>
@@ -187,9 +237,9 @@ const CartItemRow: React.FC<CartItemRowProps> = ({
         <QuantityButton label="+" onPress={onIncrease} variant="ghost" />
       </View>
       <View style={styles.cartItemTotals}>
-        <Text style={styles.cartItemSubtotal}>${item.subtotal.toFixed(2)}</Text>
+        <Text style={styles.cartItemSubtotal}>{formatCurrency(item.subtotal)}</Text>
         <Text style={styles.cartItemUnitPrice}>
-          {item.quantity} × ${item.unitPrice.toFixed(2)}
+          {item.quantity} × {formatCurrency(item.unitPrice)}
         </Text>
       </View>
     </View>
@@ -210,6 +260,8 @@ export const SalesScreen: React.FC = () => {
     discount,
     total,
     filteredProducts,
+    searchQuery,
+    setSearchQuery,
     setSelectedCategory,
     addToCart: _addToCart,
     updateQuantity,
@@ -219,7 +271,6 @@ export const SalesScreen: React.FC = () => {
     finalizeSale,
   } = usePOSController();
 
-  const [scannerValue, setScannerValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState(false);
   const [discountInput, setDiscountInput] = useState('');
@@ -244,7 +295,7 @@ export const SalesScreen: React.FC = () => {
   };
 
   const handleScannerSubmit = () => {
-    const code = scannerValue.trim();
+    const code = searchQuery.trim();
     if (!code) {
       return;
     }
@@ -255,7 +306,7 @@ export const SalesScreen: React.FC = () => {
     );
     if (product) {
       addToCart(product);
-      setScannerValue('');
+      setSearchQuery('');
     }
   };
 
@@ -341,8 +392,8 @@ export const SalesScreen: React.FC = () => {
               style={styles.scannerInput}
               placeholder="Escanear código de barras o buscar producto..."
               placeholderTextColor="#9CA3AF"
-              value={scannerValue}
-              onChangeText={setScannerValue}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
               onSubmitEditing={handleScannerSubmit}
               returnKeyType="search"
             />
@@ -401,13 +452,16 @@ export const SalesScreen: React.FC = () => {
           style={styles.productsScroll}
           showsVerticalScrollIndicator={false}>
           <View style={styles.productsGrid}>
-            {filteredProducts.map(product => (
-              <View
-                key={product.id ?? product.code}
-                style={styles.productCardWrapper}>
-                <ProductCard product={product} onPress={addToCart} />
-              </View>
-            ))}
+            {filteredProducts.map(product => {
+              const quantityInCart = cart.find(c => c.productId === product.id)?.quantity || 0;
+              return (
+                <View
+                  key={product.id ?? product.code}
+                  style={styles.productCardWrapper}>
+                  <ProductCard product={product} quantityInCart={quantityInCart} onPress={addToCart} />
+                </View>
+              );
+            })}
             {!loading && filteredProducts.length === 0 && (
               <View style={styles.emptyStateContainer}>
                 <Icon name="inventory" size={48} color="#D1D5DB" />
@@ -471,13 +525,7 @@ export const SalesScreen: React.FC = () => {
           <View style={styles.cartSummaryWrapper}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal</Text>
-              <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>
-                IVA ({(TAX_RATE * 100).toFixed(0)}%)
-              </Text>
-              <Text style={styles.summaryValue}>${tax.toFixed(2)}</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(subtotal)}</Text>
             </View>
 
             {editingDiscount ? (
@@ -508,7 +556,7 @@ export const SalesScreen: React.FC = () => {
                   Descuento
                 </Text>
                 <Text style={[styles.summaryValue, styles.discountValue]}>
-                  -${discount.toFixed(2)}
+                  -{formatCurrency(discount)}
                 </Text>
               </TouchableOpacity>
             )}
@@ -517,7 +565,7 @@ export const SalesScreen: React.FC = () => {
 
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Total a Pagar</Text>
-              <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+              <Text style={styles.totalValue}>{formatCurrency(total)}</Text>
             </View>
 
             <View style={styles.actionButtonsRow}>
@@ -542,9 +590,9 @@ export const SalesScreen: React.FC = () => {
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
                   <>
-                    <Icon name="payment" size={20} color="#FFFFFF" />
+                    <Image source={{uri: PAYMENT_ICON}} style={{width: 24, height: 24}} resizeMode="contain" />
                     <Text style={styles.checkoutButtonText}>
-                      Cobrar ${total.toFixed(2)}
+                      Cobrar {formatCurrency(total)}
                     </Text>
                   </>
                 )}
