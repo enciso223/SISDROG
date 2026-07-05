@@ -1,13 +1,4 @@
 services:
-  # --- SERVICIO FRONTEND ---
-  frontend:
-    build: ./frontend
-    container_name: pharmacy_frontend
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
-    restart: always
 
   # --- SERVICIO BACKEND ---
   backend:
@@ -43,6 +34,19 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  frontend:
+    build: ./frontend
+    container_name: pharmacy_frontend
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - REACT_NATIVE_PACKAGER_HOSTNAME=localhost
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:

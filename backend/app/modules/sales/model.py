@@ -29,6 +29,10 @@ class SaleItem(Base):
     sale = relationship("Sale", back_populates="items")
     product = relationship("Product", back_populates="sale_items")
 
+    @property
+    def product_name(self) -> str:
+        return self.product.name if self.product else "Desconocido"
+
 
 class SaleReceipt(Base):
     """HU-03: comprobante de venta"""

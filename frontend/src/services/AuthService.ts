@@ -1,0 +1,27 @@
+/**
+ * Servicio de autenticación: expone las operaciones CRUD contra /auth.
+ */
+
+import apiClient from './api';
+import {UserCreate, User} from '../models';
+
+export interface AuthResponse {
+  user: User;
+  accessToken?: string;
+  tokenType?: string;
+}
+
+class AuthService {
+  async register(data: UserCreate): Promise<AuthResponse> {
+    const response = await apiClient.post<AuthResponse>('/auth/register', data);
+    return response.data;
+  }
+
+  async login(data: {email: string; password: string}): Promise<AuthResponse> {
+    // TODO: reemplazar por el endpoint real de login cuando exista en el backend
+    const response = await apiClient.post<AuthResponse>('/auth/login', data);
+    return response.data;
+  }
+}
+
+export const authService = new AuthService();

@@ -89,8 +89,8 @@ class ProductCreate(BaseModel):
     @field_validator("purchase_price")
     @classmethod
     def purchase_price_positive(cls, v):
-        if v <= 0:
-            raise ValueError("El precio de compra debe ser mayor a 0")
+        if v < 0:
+            raise ValueError("El precio de compra no puede ser negativo")
         return v
 
     @field_validator("sale_price")
@@ -124,6 +124,7 @@ class ProductUpdate(BaseModel):
     sale_price: Optional[float] = None
     batch: Optional[str] = None
     expiry_date: Optional[date] = None
+    stock: Optional[int] = None
     min_stock: Optional[int] = None
     category_id: Optional[int] = None
     supplier_id: Optional[int] = None
@@ -132,8 +133,8 @@ class ProductUpdate(BaseModel):
     @field_validator("purchase_price")
     @classmethod
     def purchase_price_positive(cls, v):
-        if v is not None and v <= 0:
-            raise ValueError("El precio de compra debe ser mayor a 0")
+        if v is not None and v < 0:
+            raise ValueError("El precio de compra no puede ser negativo")
         return v
 
     @field_validator("sale_price")

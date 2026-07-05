@@ -1,0 +1,538 @@
+/**
+ * Estilos para la pantalla de ventas (POS).
+ */
+
+import {StyleSheet} from 'react-native';
+
+export const PRIMARY = '#0D9488';
+export const PRIMARY_DARK = '#0F766E';
+export const PRIMARY_LIGHT = '#F0FDFA';
+export const TEXT_MAIN = '#111827';
+export const TEXT_MUTED = '#6B7280';
+export const BORDER = '#E5E7EB';
+
+export const salesStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+  },
+
+  /* ─── Área principal (Catálogo) ─── */
+  main: {
+    flex: 1,
+    paddingTop: 20,
+    paddingLeft: 24,
+    paddingRight: 16,
+    paddingBottom: 0,
+  },
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  scannerRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 48,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  scannerInput: {
+    flex: 1,
+    fontSize: 15,
+    color: TEXT_MAIN,
+    marginLeft: 10,
+    paddingVertical: 0,
+  },
+  scannerStatus: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+    marginLeft: 8,
+  },
+  openCartFab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PRIMARY,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    gap: 8,
+    shadowColor: PRIMARY_DARK,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  openCartFabText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  openCartBadge: {
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  openCartBadgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+
+  /* ─── Categorías ─── */
+  categories: {
+    marginBottom: 16,
+  },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 100,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: BORDER,
+    marginRight: 10,
+  },
+  chipActive: {
+    backgroundColor: TEXT_MAIN,
+    borderColor: TEXT_MAIN,
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: TEXT_MUTED,
+  },
+  chipTextActive: {
+    color: '#FFFFFF',
+  },
+
+  /* ─── Grilla de productos ─── */
+  productsScroll: {
+    flex: 1,
+  },
+  productsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginLeft: -6,
+    marginRight: -6,
+  },
+  productCardWrapper: {
+    width: '33.33%',
+    padding: 6,
+  },
+  productCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    minHeight: 170,
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  productCardDisabled: {
+    opacity: 0.45,
+  },
+  productCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  productIconPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: PRIMARY_LIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  productCardBody: {
+    flex: 1,
+  },
+  productName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: TEXT_MAIN,
+    marginBottom: 3,
+    lineHeight: 20,
+  },
+  productLab: {
+    fontSize: 12,
+    color: TEXT_MUTED,
+    fontWeight: '500',
+  },
+  productFooter: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  productPrice: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: PRIMARY,
+    letterSpacing: -0.5,
+  },
+  addButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  /* ─── Badges de stock ─── */
+  stockBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  badgeGreen: {backgroundColor: '#ECFDF5'},
+  badgeYellow: {backgroundColor: '#FFFBEB'},
+  badgeRed: {backgroundColor: '#FEF2F2'},
+  badgeTextGreen: {color: '#059669', fontSize: 11, fontWeight: '700'},
+  badgeTextYellow: {color: '#D97706', fontSize: 11, fontWeight: '700'},
+  badgeTextRed: {color: '#DC2626', fontSize: 11, fontWeight: '700'},
+
+  /* ─── Estados vacíos / error ─── */
+  emptyStateContainer: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 80,
+  },
+  emptyText: {
+    marginTop: 16,
+    color: TEXT_MUTED,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  errorText: {
+    color: '#DC2626',
+    marginBottom: 12,
+    textAlign: 'center',
+    backgroundColor: '#FEF2F2',
+    padding: 10,
+    borderRadius: 8,
+    fontWeight: '500',
+    fontSize: 13,
+  },
+
+  /* ─── Panel del Carrito ─── */
+  cartPanel: {
+    width: 360,
+    backgroundColor: '#FFFFFF',
+    borderLeftWidth: 1,
+    borderLeftColor: '#E9ECF0',
+    shadowColor: '#000',
+    shadowOffset: {width: -4, height: 0},
+    shadowOpacity: 0.06,
+    shadowRadius: 20,
+    elevation: 8,
+    paddingTop: 20,
+  },
+  cartHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  cartTitleBlock: {
+    flex: 1,
+  },
+  cartTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: TEXT_MAIN,
+    letterSpacing: -0.5,
+  },
+  cartSubtitle: {
+    fontSize: 13,
+    color: TEXT_MUTED,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cartItems: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  cartEmptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 64,
+  },
+  cartEmpty: {
+    color: TEXT_MAIN,
+    marginTop: 14,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  cartEmptySub: {
+    color: TEXT_MUTED,
+    marginTop: 4,
+    fontSize: 13,
+  },
+
+  /* ─── Item del carrito ─── */
+  cartItem: {
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    marginHorizontal: 2,
+  },
+  cartItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  cartItemName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: TEXT_MAIN,
+    marginRight: 10,
+    lineHeight: 20,
+  },
+  cartItemRemoveBtn: {
+    padding: 4,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 6,
+  },
+  cartItemFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cartQtyControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    padding: 2,
+  },
+  cartQty: {
+    width: 30,
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '700',
+    color: TEXT_MAIN,
+  },
+  cartItemTotals: {
+    alignItems: 'flex-end',
+  },
+  cartItemSubtotal: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: PRIMARY,
+    letterSpacing: -0.5,
+  },
+  cartItemUnitPrice: {
+    fontSize: 11,
+    color: TEXT_MUTED,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+
+  /* ─── Botones de cantidad ─── */
+  qtyButton: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 6,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  qtyButtonGhost: {
+    backgroundColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  qtyButtonDisabled: {opacity: 0.4},
+  qtyButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: TEXT_MAIN,
+  },
+  qtyButtonTextGhost: {color: TEXT_MUTED},
+  qtyButtonTextDisabled: {color: '#D1D5DB'},
+
+  /* ─── Resumen del carrito ─── */
+  cartSummaryWrapper: {
+    backgroundColor: '#F9FAFB',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#E9ECF0',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: TEXT_MUTED,
+    fontWeight: '500',
+  },
+  summaryValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: TEXT_MAIN,
+  },
+  discountLabel: {color: '#059669'},
+  discountValue: {color: '#059669'},
+  discountInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  discountInput: {
+    flex: 1,
+    height: 34,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#10B981',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    fontSize: 14,
+    fontWeight: '600',
+    color: TEXT_MAIN,
+    textAlign: 'right',
+    marginLeft: 10,
+    marginRight: 6,
+  },
+  discountCancel: {
+    fontSize: 16,
+    color: TEXT_MUTED,
+    fontWeight: 'bold',
+    padding: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 12,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  totalLabel: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: TEXT_MAIN,
+  },
+  totalValue: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: TEXT_MAIN,
+    letterSpacing: -1,
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  clearButton: {
+    width: 52,
+    height: 52,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkoutButton: {
+    flex: 1,
+    height: 56,
+    backgroundColor: '#10B981',
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#10B981',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  checkoutButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  checkoutButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
+  /* ─── Utilidades (antes inline) ─── */
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    lineHeight: 22,
+    textAlign: 'center',
+    includeFontPadding: false,
+  },
+  categoriesScrollContent: {
+    paddingRight: 16,
+  },
+  loadingIndicator: {
+    marginTop: 32,
+  },
+  bottomSpacer: {
+    height: 32,
+  },
+});
