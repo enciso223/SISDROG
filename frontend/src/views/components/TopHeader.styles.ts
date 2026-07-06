@@ -14,6 +14,8 @@ export const topHeaderStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECF0',
     gap: 16,
+    zIndex: 10,
+    elevation: 10,
   },
 
   /* ─── Título de sección ─── */
@@ -60,6 +62,8 @@ export const topHeaderStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     marginLeft: 'auto',
+    zIndex: 10,
+    elevation: 10,
   },
   userInfo: {
     alignItems: 'flex-end',
@@ -96,5 +100,33 @@ export const topHeaderStyles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  
+  /* ─── Popover Menu ─── */
+  popoverMenu: {
+    position: 'absolute',
+    top: 45,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingVertical: 4,
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    zIndex: 100,
+  },
+  popoverItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  popoverItemText: {
+    fontSize: 13,
+    color: '#EF4444',
+    fontWeight: '600',
   },
 });

@@ -1,15 +1,27 @@
 /**
  * Punto de entrada de la aplicación SISDROG Desktop.
  * React Native Windows + TypeScript + arquitectura MVC.
+ *
+ * Flujo de navegación:
+ *   login → (registro opcional) → dashboard (sidebar + pantallas)
  */
 
 import React, {useState} from 'react';
 import {View, StyleSheet} from 'react-native';
-import {HomeScreen, InventoryScreen, SalesScreen} from './src/views/screens';
+import {
+  HomeScreen,
+  InventoryScreen,
+  SalesScreen,
+  LoginScreen,
+  RegisterScreen,
+} from './src/views/screens';
 import {Sidebar, TopHeader} from './src/views/components';
 import type {AppScreen} from './src/views/components/Sidebar';
 
-// Mapa de títulos por pantalla
+// ── Tipos de pantallas de auth ────────────────────────────────────────────
+type AuthScreen = 'login' | 'register';
+
+// ── Mapa de títulos por pantalla del dashboard ───────────────────────────
 const SCREEN_TITLES: Record<AppScreen, {title: string; breadcrumb: string}> = {
   home: {title: 'Inicio', breadcrumb: 'Panel principal'},
   sales: {title: 'Ventas (POS)', breadcrumb: 'Punto de venta'},
@@ -21,10 +33,44 @@ const SCREEN_TITLES: Record<AppScreen, {title: string; breadcrumb: string}> = {
 };
 
 function App(): React.JSX.Element {
+  // ── Estado de autenticación ──────────────────────────────────────────
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authScreen, setAuthScreen] = useState<AuthScreen>('login');
+
+  // ── Estado del dashboard ─────────────────────────────────────────────
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
 
+  // ── Handlers de auth ─────────────────────────────────────────────────
+  const handleLoginSuccess = () => {
+    setIsAuthenticated(true);
+  };
+
+  const handleRegisterSuccess = () => {
+    // Tras registrarse exitosamente, llevar al login
+    setAuthScreen('login');
+  };
+
+  // ── Renderizado condicional: auth vs dashboard ───────────────────────
+  if (!isAuthenticated) {
+    if (authScreen === 'register') {
+      return (
+        <RegisterScreen
+          onRegisterSuccess={handleRegisterSuccess}
+          onNavigateToLogin={() => setAuthScreen('login')}
+        />
+      );
+    }
+    return (
+      <LoginScreen
+        onLoginSuccess={handleLoginSuccess}
+        onNavigateToRegister={() => setAuthScreen('register')}
+      />
+    );
+  }
+
+  // ── Dashboard ────────────────────────────────────────────────────────
   const screenInfo = SCREEN_TITLES[currentScreen];
 
   const renderScreen = () => {
@@ -54,15 +100,18 @@ function App(): React.JSX.Element {
         onToggleExpand={() => setIsSidebarExpanded(prev => !prev)}
       />
       <View style={styles.content}>
-        <TopHeader
-          title={screenInfo.title}
-          breadcrumb={screenInfo.breadcrumb}
-          searchValue={searchQuery}
-          onSearchChange={setSearchQuery}
-          placeholder="Buscar productos, ventas..."
-          userName="Admin"
-          userRole="Administrador"
-        />
+        <View style={{zIndex: 10, elevation: 10}}>
+          <TopHeader
+            title={screenInfo.title}
+            breadcrumb={screenInfo.breadcrumb}
+            searchValue={searchQuery}
+            onSearchChange={setSearchQuery}
+            placeholder="Buscar productos, ventas..."
+            userName="Admin"
+            userRole="Administrador"
+            onLogout={() => setIsAuthenticated(false)}
+          />
+        </View>
         <View style={styles.screen}>{renderScreen()}</View>
       </View>
     </View>

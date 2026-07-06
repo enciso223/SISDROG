@@ -13,7 +13,13 @@ export interface AuthResponse {
 
 class AuthService {
   async register(data: UserCreate): Promise<AuthResponse> {
-    const response = await apiClient.post<AuthResponse>('/auth/register', data);
+    // El backend espera { name, email, password }
+    const payload = {
+      name: data.fullName ?? data.email.split('@')[0],
+      email: data.email,
+      password: data.password,
+    };
+    const response = await apiClient.post<AuthResponse>('/auth/register', payload);
     return response.data;
   }
 
