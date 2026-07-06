@@ -3,8 +3,8 @@
  * Los estilos están en TopHeader.styles.ts
  */
 
-import React from 'react';
-import {View, TextInput, Text, TouchableOpacity} from 'react-native';
+import React, {useState} from 'react';
+import {View, TextInput, Text, TouchableOpacity, Alert} from 'react-native';
 import {Icon} from './Icon';
 import {topHeaderStyles as styles} from './TopHeader.styles';
 
@@ -16,6 +16,7 @@ interface TopHeaderProps {
   placeholder?: string;
   userName?: string;
   userRole?: string;
+  onLogout?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -26,7 +27,18 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   placeholder = 'Buscar productos, ventas...',
   userName = 'Usuario',
   userRole = 'Administrador',
+  onLogout,
 }) => {
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  const handleLogoutPress = () => {
+    setMenuVisible(false);
+    Alert.alert('Cerrar sesión', '¿Desea cerrar sesión?', [
+      {text: 'No', style: 'cancel'},
+      {text: 'Sí', onPress: onLogout},
+    ]);
+  };
+
   return (
     <View style={styles.container}>
       {/* Título de sección */}
@@ -61,10 +73,25 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </View>
 
         {/* Avatar */}
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {userName.charAt(0).toUpperCase()}
-          </Text>
+        <View style={{position: 'relative'}}>
+          <TouchableOpacity
+            style={styles.avatar}
+            activeOpacity={0.7}
+            onPress={() => setMenuVisible(!menuVisible)}>
+            <Text style={styles.avatarText}>
+              {userName.charAt(0).toUpperCase()}
+            </Text>
+          </TouchableOpacity>
+
+          {menuVisible && (
+            <View style={styles.popoverMenu}>
+              <TouchableOpacity
+                style={styles.popoverItem}
+                onPress={handleLogoutPress}>
+                <Text style={styles.popoverItemText}>Cerrar sesión</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
     </View>

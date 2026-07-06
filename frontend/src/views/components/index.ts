@@ -9,3 +9,4 @@ export {Icon} from './Icon';
 export type {IconName} from './Icon';
 export {AlertsPanel} from './AlertsPanel';
 export {ProductRow} from './ProductRow';
+export {SessionTimeoutModal} from './SessionTimeoutModal';
