@@ -1,8 +1,14 @@
 /**
  * Vista: Inicio de sesión — minimalista.
+ *
+ * Seguridad:
+ *  - Contraseña oculta por defecto (toggle mostrar/ocultar).
+ *  - Autofill desactivado para credenciales.
+ *  - Al desmontar, la contraseña se limpia del estado.
+ *  - Errores mostrados ya vienen sanitizados desde el interceptor HTTP.
  */
 
-import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback, useEffect} from 'react';
 import {
   View,
   Text,
@@ -26,9 +32,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState<'email' | 'password' | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  // Limpieza defensiva: al desmontar la pantalla, borrar la contraseña de memoria.
+  useEffect(() => {
+    return () => setPassword('');
+  }, []);
 
   const validate = (): boolean => {
     let valid = true;
@@ -39,7 +51,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setEmailError(null);
     }
     if (!password || password.length < 6) {
-      setPasswordError('Mínimo 6 caracteres');
+      setPasswordError('Ingresa tu contraseña');
       valid = false;
     } else {
       setPasswordError(null);
@@ -52,9 +64,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     if (!validate()) {return;}
     try {
       await login({email: email.trim(), password});
+      // Limpiar contraseña de memoria inmediatamente tras el login exitoso.
+      setPassword('');
       onLoginSuccess();
     } catch {
-      // El error queda en el controlador
+      // El error queda sanitizado en el controlador.
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email, password]);
@@ -97,34 +111,49 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
+            textContentType="username"
             onFocus={() => setFocusedField('email')}
             onBlur={() => setFocusedField(null)}
           />
           {!!emailError && <Text style={styles.fieldError}>{emailError}</Text>}
         </View>
 
-        {/* Contraseña */}
+        {/* Contraseña con toggle mostrar/ocultar */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Contraseña</Text>
-          <TextInput
-            style={[
-              styles.input,
-              focusedField === 'password' && styles.inputFocused,
-              !!passwordError && styles.inputError,
-            ]}
-            value={password}
-            onChangeText={t => {
-              setPassword(t);
-              if (passwordError) {setPasswordError(null);}
-              if (error) {clearError();}
-            }}
-            placeholder="••••••••"
-            placeholderTextColor="#94A3B8"
-            secureTextEntry
-            autoCapitalize="none"
-            onFocus={() => setFocusedField('password')}
-            onBlur={() => setFocusedField(null)}
-          />
+          <View style={styles.passwordWrapper}>
+            <TextInput
+              style={[
+                styles.input,
+                styles.passwordInput,
+                focusedField === 'password' && styles.inputFocused,
+                !!passwordError && styles.inputError,
+              ]}
+              value={password}
+              onChangeText={t => {
+                setPassword(t);
+                if (passwordError) {setPasswordError(null);}
+                if (error) {clearError();}
+              }}
+              placeholder="••••••••"
+              placeholderTextColor="#94A3B8"
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="password"
+              onFocus={() => setFocusedField('password')}
+              onBlur={() => setFocusedField(null)}
+            />
+            <TouchableOpacity
+              style={styles.passwordToggle}
+              onPress={() => setShowPassword(v => !v)}
+              activeOpacity={0.7}
+              accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+              <Text style={styles.passwordToggleText}>
+                {showPassword ? 'Ocultar' : 'Mostrar'}
+              </Text>
+            </TouchableOpacity>
+          </View>
           {!!passwordError && <Text style={styles.fieldError}>{passwordError}</Text>}
         </View>
 

@@ -61,14 +61,18 @@ export const registerStyles = StyleSheet.create({
     marginBottom: 6,
   },
   input: {
-    height: 44,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 8,
     paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
     fontSize: 14,
+    lineHeight: 18,
     color: '#0F172A',
     backgroundColor: '#F8FAFC',
+    boxSizing: 'border-box' as any,
   },
   inputFocused: {
     borderColor: '#0078D4',
@@ -126,6 +130,64 @@ export const registerStyles = StyleSheet.create({
   },
   successBoxText: {
     fontSize: 12,
+    color: '#16A34A',
+  },
+
+  // ── Contraseña con toggle ─────────────────────────────────────────
+  passwordWrapper: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  passwordInput: {
+    paddingRight: 72,
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: 6,
+    top: 0,
+    bottom: 0,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passwordToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0078D4',
+  },
+
+  // ── Medidor de fortaleza ──────────────────────────────────────────
+  strengthWrapper: {
+    marginTop: 6,
+  },
+  strengthBarTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+    overflow: 'hidden',
+    flexDirection: 'row',
+  },
+  strengthBarFill: {
+    height: 4,
+  },
+  strengthLabel: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  strengthHint: {
+    marginTop: 2,
+    fontSize: 11,
+    color: '#64748B',
+  },
+  policyList: {
+    marginTop: 6,
+  },
+  policyItem: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  policyItemOk: {
     color: '#16A34A',
   },
 

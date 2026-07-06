@@ -1,6 +1,10 @@
 /**
  * Controlador de autenticación (MVC).
  * Orquesta las llamadas al servicio de auth y expone estado a las vistas.
+ *
+ * Seguridad:
+ *  - Nunca almacena la contraseña en el estado más allá de la llamada.
+ *  - Usa el error ya sanitizado por el interceptor HTTP.
  */
 
 import {useState, useCallback} from 'react';
@@ -13,6 +17,7 @@ interface UseAuthControllerReturn {
   error: string | null;
   register: (data: UserCreate) => Promise<void>;
   login: (data: UserLogin) => Promise<void>;
+  logout: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -51,6 +56,15 @@ export const useAuthController = (): UseAuthControllerReturn => {
     }
   }, []);
 
+  const logout = useCallback(async (): Promise<void> => {
+    try {
+      await authService.logout();
+    } finally {
+      setUser(null);
+      setError(null);
+    }
+  }, []);
+
   const clearError = useCallback(() => setError(null), []);
 
   return {
@@ -59,6 +73,7 @@ export const useAuthController = (): UseAuthControllerReturn => {
     error,
     register,
     login,
+    logout,
     clearError,
   };
 };

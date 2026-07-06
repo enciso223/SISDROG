@@ -4,9 +4,15 @@
  *
  * Flujo de navegación:
  *   login → (registro opcional) → dashboard (sidebar + pantallas)
+ *
+ * Seguridad de sesión:
+ *   - Detecta actividad (touch, teclado, scroll) para reiniciar el timer.
+ *   - Muestra modal de advertencia 1 min antes de expirar.
+ *   - Cierra sesión automáticamente por inactividad (15 min).
+ *   - Al cerrar sesión limpia token de memoria vía authService.logout().
  */
 
-import React, {useState} from 'react';
+import React, {useCallback, useState} from 'react';
 import {View, StyleSheet} from 'react-native';
 import {
   HomeScreen,
@@ -15,8 +21,15 @@ import {
   LoginScreen,
   RegisterScreen,
 } from './src/views/screens';
-import {Sidebar, TopHeader} from './src/views/components';
+import {
+  Sidebar,
+  TopHeader,
+  SessionTimeoutModal,
+} from './src/views/components';
 import type {AppScreen} from './src/views/components/Sidebar';
+import {useSession} from './src/controllers';
+import {authService} from './src/services';
+import {sessionManager} from './src/security';
 
 // ── Tipos de pantallas de auth ────────────────────────────────────────────
 type AuthScreen = 'login' | 'register';
@@ -42,15 +55,35 @@ function App(): React.JSX.Element {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
 
+  // ── Cierre de sesión (manual o por expiración) ───────────────────────
+  const handleLogout = useCallback(() => {
+    // Limpia token en memoria y llama al backend (fire-and-forget).
+    void authService.logout();
+    setIsAuthenticated(false);
+    setCurrentScreen('home');
+  }, []);
+
+  // ── Gestor de sesión: warning + auto-logout por inactividad ─────────
+  const {showWarning, remainingMs, extendSession} = useSession({
+    enabled: isAuthenticated,
+    onExpire: handleLogout,
+  });
+
   // ── Handlers de auth ─────────────────────────────────────────────────
   const handleLoginSuccess = () => {
     setIsAuthenticated(true);
   };
 
   const handleRegisterSuccess = () => {
-    // Tras registrarse exitosamente, llevar al login
     setAuthScreen('login');
   };
+
+  // Cualquier interacción con la app cuenta como actividad
+  const trackActivity = useCallback(() => {
+    if (isAuthenticated) {
+      sessionManager.registerActivity();
+    }
+  }, [isAuthenticated]);
 
   // ── Renderizado condicional: auth vs dashboard ───────────────────────
   if (!isAuthenticated) {
@@ -92,12 +125,15 @@ function App(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      onStartShouldSetResponder={() => {trackActivity(); return false;}}
+      onResponderMove={trackActivity}>
       <Sidebar
         activeScreen={currentScreen}
-        onNavigate={setCurrentScreen}
+        onNavigate={s => {trackActivity(); setCurrentScreen(s);}}
         isExpanded={isSidebarExpanded}
-        onToggleExpand={() => setIsSidebarExpanded(prev => !prev)}
+        onToggleExpand={() => {trackActivity(); setIsSidebarExpanded(prev => !prev);}}
       />
       <View style={styles.content}>
         <View style={{zIndex: 10, elevation: 10}}>
@@ -105,15 +141,23 @@ function App(): React.JSX.Element {
             title={screenInfo.title}
             breadcrumb={screenInfo.breadcrumb}
             searchValue={searchQuery}
-            onSearchChange={setSearchQuery}
+            onSearchChange={v => {trackActivity(); setSearchQuery(v);}}
             placeholder="Buscar productos, ventas..."
             userName="Admin"
             userRole="Administrador"
-            onLogout={() => setIsAuthenticated(false)}
+            onLogout={handleLogout}
           />
         </View>
         <View style={styles.screen}>{renderScreen()}</View>
       </View>
+
+      {/* Modal de expiración de sesión por inactividad */}
+      <SessionTimeoutModal
+        visible={showWarning}
+        remainingMs={remainingMs}
+        onContinue={extendSession}
+        onLogout={handleLogout}
+      />
     </View>
   );
 }

@@ -60,14 +60,18 @@ export const loginStyles = StyleSheet.create({
     marginBottom: 6,
   },
   input: {
-    height: 44,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 8,
     paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
     fontSize: 14,
+    lineHeight: 18,
     color: '#0F172A',
     backgroundColor: '#F8FAFC',
+    boxSizing: 'border-box' as any,
   },
   inputFocused: {
     borderColor: '#0078D4',
@@ -113,6 +117,29 @@ export const loginStyles = StyleSheet.create({
   errorBoxText: {
     fontSize: 12,
     color: '#DC2626',
+  },
+
+  // ── Contraseña con toggle ─────────────────────────────────────────
+  passwordWrapper: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  passwordInput: {
+    paddingRight: 72,
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: 6,
+    top: 0,
+    bottom: 0,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passwordToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0078D4',
   },
 
   // ── Enlace inferior ───────────────────────────────────────────────
