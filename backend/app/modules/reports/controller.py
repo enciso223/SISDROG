@@ -1,26 +1,26 @@
-from typing import List
+from sqlalchemy.orm import Session
+from datetime import date
+from typing import Optional
 
-from app.modules import service
-from app.modules.schema import MedicineCreate, MedicineUpdate
-
-
-def list_medicines(skip: int = 0, limit: int = 100):
-	return service.list_medicines(skip=skip, limit=limit)
+from app.modules.reports.service import ReportsService
 
 
-def get_medicine(medicine_id: int):
-	return service.get_medicine(medicine_id)
+class ReportsController:
 
+    def __init__(self):
+        self.service = ReportsService()
 
-def create_medicine(data: MedicineCreate):
-	return service.create_medicine(data)
+    def get_purchase_history(self, db, skip, limit, date_from, date_to, supplier_id):
+        return self.service.get_purchase_history(db, skip, limit, date_from, date_to, supplier_id)
 
+    def get_financial_balance(self, db, date_from, date_to):
+        return self.service.get_financial_balance(db, date_from, date_to)
 
-def update_medicine(medicine_id: int, data: MedicineUpdate):
-	return service.update_medicine(medicine_id, data)
+    def get_sales_report(self, db, date_from, date_to):
+        return self.service.get_sales_report(db, date_from, date_to)
 
+    def get_top_products(self, db, limit, date_from, date_to):
+        return self.service.get_top_products(db, limit, date_from, date_to)
 
-def delete_medicine(medicine_id: int):
-	return service.delete_medicine(medicine_id)
-
-
+    def get_inventory_value(self, db):
+        return self.service.get_inventory_value(db)
