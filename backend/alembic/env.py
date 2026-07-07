@@ -4,9 +4,9 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from app.database.database import Base
 from app.modules.auth.model import User
-from app.modules.inventory.model import Category, Supplier, Product
+from app.modules.inventory.model import Category, Product, ProductLot
 from app.modules.sales.model import Sale, SaleItem, SaleReceipt
-from app.modules.purchases.model import Purchase, PurchaseItem
+from app.modules.purchases.model import Purchase
 from app.modules.expenses.model import Expense
 from app.modules.donations.model import Donation, DonationItem, ProductMovement
 
@@ -28,7 +28,6 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
-
     with context.begin_transaction():
         context.run_migrations()
 
@@ -39,12 +38,10 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-
     with connectable.connect() as connection:
         context.configure(
             connection=connection, target_metadata=target_metadata
         )
-
         with context.begin_transaction():
             context.run_migrations()
 

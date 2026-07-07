@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
+from datetime import date
 
-from app.modules.inventory.repository import ProductRepository, CategoryRepository, SupplierRepository
-from app.modules.inventory.model import Product, Category, Supplier
-from app.modules.inventory.schema import ProductCreate, ProductUpdate, CategoryCreate, SupplierCreate, SupplierUpdate
+from app.modules.inventory.repository import ProductRepository, CategoryRepository, ProductLotRepository
+from app.modules.inventory.model import Product, Category, ProductLot
+from app.modules.inventory.schema import ProductCreate, ProductUpdate, CategoryCreate, ProductLotCreate
 
 
 class CategoryService:
@@ -25,35 +26,62 @@ class CategoryService:
         return self.repo.create(db, category)
 
 
-class SupplierService:
+class ProductLotService:
 
     def __init__(self):
-        self.repo = SupplierRepository()
+        self.repo = ProductLotRepository()
+        self.product_repo = ProductRepository()
 
-    def get_all(self, db: Session, skip: int = 0, limit: int = 100):
-        return self.repo.get_all(db, skip, limit)
+    def get_lots_by_product(self, db: Session, product_id: int):
+        product = self.product_repo.get_by_id(db, product_id)
+        if not product or not product.is_active:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+        return self.repo.get_by_product(db, product_id)
 
-    def get_by_id(self, db: Session, supplier_id: int):
-        supplier = self.repo.get_by_id(db, supplier_id)
-        if not supplier:
-            raise HTTPException(status_code=404, detail="Proveedor no encontrado")
-        return supplier
+    def add_lot(self, db: Session, product_id: int, data: ProductLotCreate):
+        product = self.product_repo.get_by_id(db, product_id)
+        if not product or not product.is_active:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    def create(self, db: Session, data: SupplierCreate):
-        supplier = Supplier(**data.model_dump())
-        return self.repo.create(db, supplier)
+        if data.expiry_date <= date.today():
+            raise HTTPException(
+                status_code=400,
+                detail="La fecha de vencimiento debe ser futura"
+            )
 
-    def update(self, db: Session, supplier_id: int, data: SupplierUpdate):
-        supplier = self.get_by_id(db, supplier_id)
-        for field, value in data.model_dump(exclude_unset=True).items():
-            setattr(supplier, field, value)
-        return self.repo.update(db, supplier)
+        lot = ProductLot(
+            product_id=product_id,
+            **data.model_dump()
+        )
+        self.repo.create(db, lot)
+        product.stock += data.stock
+        db.commit()
+        db.refresh(lot)
+        return lot
+
+    def get_expiring_soon(self, db: Session, days: int = 30):
+        lots = self.repo.get_expiring_soon(db, days)
+        result = []
+        for lot in lots:
+            days_until = (lot.expiry_date - date.today()).days
+            result.append({
+                "lot_id": lot.id,
+                "product_id": lot.product_id,
+                "product_name": lot.product.name,
+                "lot_number": lot.lot_number,
+                "expiry_date": lot.expiry_date,
+                "days_until_expiry": days_until,
+                "stock": lot.stock
+            })
+        return result
 
 
 class ProductService:
 
     def __init__(self):
         self.repo = ProductRepository()
+        self.lot_repo = ProductLotRepository()
+        self.category_repo = CategoryRepository()
 
     def get_all(self, db: Session, skip: int = 0, limit: int = 100):
         return self.repo.get_all(db, skip, limit)
@@ -65,43 +93,62 @@ class ProductService:
         return product
 
     def get_by_code(self, db: Session, code: str):
-        """HU-02: buscar por código de barras"""
         product = self.repo.get_by_code(db, code)
         if not product:
             raise HTTPException(status_code=404, detail="Producto no encontrado con ese código")
         return product
 
     def search(self, db: Session, query: str):
-        """HU-06: búsqueda en tiempo real"""
         return self.repo.search(db, query)
 
     def create(self, db: Session, data: ProductCreate):
-        """HU-05: crear producto"""
         existing = self.repo.get_by_code(db, data.code)
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Ya existe un producto con el código '{data.code}'"
             )
-        product = Product(**data.model_dump())
-        return self.repo.create(db, product)
+
+        lots_data = data.lots
+        product_data = data.model_dump(exclude={"lots"})
+        product = Product(**product_data)
+
+        if lots_data:
+            total_lot_stock = sum(l.stock for l in lots_data)
+            product.stock = total_lot_stock
+        
+        db.add(product)
+        db.flush()
+
+        if lots_data:
+            for lot_data in lots_data:
+                if lot_data.expiry_date <= date.today():
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"El lote '{lot_data.lot_number}' tiene fecha de vencimiento pasada o de hoy"
+                    )
+                lot = ProductLot(product_id=product.id, **lot_data.model_dump())
+                db.add(lot)
+
+        db.commit()
+        db.refresh(product)
+        return product
 
     def update(self, db: Session, product_id: int, data: ProductUpdate):
-        """HU-05: editar producto"""
         product = self.get_by_id(db, product_id)
         for field, value in data.model_dump(exclude_unset=True).items():
             setattr(product, field, value)
         return self.repo.update(db, product)
 
     def delete(self, db: Session, product_id: int):
-        """HU-05: eliminación lógica"""
         product = self.get_by_id(db, product_id)
         product.is_active = False
         return self.repo.update(db, product)
 
     def get_alerts(self, db: Session, expiry_days: int = 30):
-        """HU-07: alertas de stock bajo y vencimiento"""
+        lot_service = ProductLotService()
         return {
             "low_stock": self.repo.get_low_stock(db),
-            "expiring_soon": self.repo.get_expiring_soon(db, expiry_days)
+            "expiring_soon": lot_service.get_expiring_soon(db, expiry_days)
         }

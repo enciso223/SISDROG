@@ -1,79 +1,66 @@
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
+from fastapi import HTTPException
+from datetime import date
 
-from app.modules.purchases.repository import PurchaseRepository
-from app.modules.purchases.model import Purchase, PurchaseItem
+from app.modules.purchases.model import Purchase
 from app.modules.purchases.schema import PurchaseCreate
-from app.modules.inventory.repository import SupplierRepository, ProductRepository
+from app.modules.inventory.model import Product, ProductLot
+from app.modules.inventory.repository import ProductRepository
 
 
 class PurchaseService:
 
     def __init__(self):
-        self.repo = PurchaseRepository()
-        self.supplier_repo = SupplierRepository()
         self.product_repo = ProductRepository()
 
     def list_purchases(self, db: Session, skip: int = 0, limit: int = 100):
-        return self.repo.get_all(db, skip, limit)
+        return db.query(Purchase).filter(Purchase.is_active == True).order_by(Purchase.purchase_date.desc()).offset(skip).limit(limit).all()
 
     def get_purchase(self, db: Session, purchase_id: int):
-        purchase = self.repo.get_by_id(db, purchase_id)
+        purchase = db.query(Purchase).filter(Purchase.id == purchase_id).first()
         if not purchase or not purchase.is_active:
             raise HTTPException(status_code=404, detail="Compra no encontrada")
         return purchase
 
     def create_purchase(self, db: Session, data: PurchaseCreate):
-        supplier = self.supplier_repo.get_by_id(db, data.supplier_id)
-        if not supplier or not supplier.is_active:
-            raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+        product = self.product_repo.get_by_id(db, data.product_id)
+        if not product or not product.is_active:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-        validated_items = []
-        total_amount = 0.0
+        if data.expiry_date <= date.today():
+            raise HTTPException(status_code=400, detail="La fecha de vencimiento debe ser futura")
 
-        for item_data in data.items:
-            product = self.product_repo.get_by_id(db, item_data.product_id)
-            if not product or not product.is_active:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Producto con id {item_data.product_id} no encontrado"
-                )
-            subtotal = round(item_data.quantity * item_data.unit_price, 2)
-            total_amount += subtotal
-            validated_items.append((product, item_data.quantity, item_data.unit_price, subtotal))
+        total_amount = round(data.quantity * data.unit_price, 2)
 
-        try:
-            purchase = Purchase(
-                supplier_id=data.supplier_id,
-                purchase_date=data.purchase_date,
-                total_amount=round(total_amount, 2),
-                notes=data.notes
-            )
-            db.add(purchase)
-            db.flush()
+        purchase = Purchase(
+            product_id=data.product_id,
+            purchase_date=data.purchase_date,
+            quantity=data.quantity,
+            unit_price=data.unit_price,
+            total_amount=total_amount,
+            lot_number=data.lot_number,
+            notes=data.notes
+        )
+        db.add(purchase)
 
-            for product, quantity, unit_price, subtotal in validated_items:
-                item = PurchaseItem(
-                    purchase_id=purchase.id,
-                    product_id=product.id,
-                    quantity=quantity,
-                    unit_price=unit_price,
-                    subtotal=subtotal
-                )
-                db.add(item)
-                product.stock += quantity
+        lot = ProductLot(
+            product_id=data.product_id,
+            lot_number=data.lot_number,
+            purchase_date=data.purchase_date,
+            expiry_date=data.expiry_date,
+            stock=data.quantity
+        )
+        db.add(lot)
 
-            db.commit()
-            db.refresh(purchase)
-            return purchase
+        product.stock += data.quantity
 
-        except Exception:
-            db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No se pudo registrar la compra"
-            )
+        db.commit()
+        db.refresh(purchase)
+        return purchase
 
     def delete_purchase(self, db: Session, purchase_id: int):
         purchase = self.get_purchase(db, purchase_id)
-        return self.repo.deactivate(db, purchase)
+        purchase.is_active = False
+        db.commit()
+        db.refresh(purchase)
+        return purchase
