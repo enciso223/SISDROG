@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from datetime import date, timedelta
-from app.modules.inventory.model import Product, Category, Supplier
+from typing import Optional
+from app.modules.inventory.model import Product, Category, ProductLot
 
 
 class CategoryRepository:
@@ -22,30 +23,55 @@ class CategoryRepository:
         return category
 
 
-class SupplierRepository:
+class ProductLotRepository:
 
-    def get_all(self, db: Session, skip: int = 0, limit: int = 100):
-        return db.query(Supplier).filter(Supplier.is_active == True).offset(skip).limit(limit).all()
+    def get_by_product(self, db: Session, product_id: int):
+        return (
+            db.query(ProductLot)
+            .filter(ProductLot.product_id == product_id, ProductLot.is_active == True)
+            .order_by(ProductLot.expiry_date.asc())
+            .all()
+        )
 
-    def get_by_id(self, db: Session, supplier_id: int):
-        return db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    def get_by_id(self, db: Session, lot_id: int):
+        return db.query(ProductLot).filter(ProductLot.id == lot_id).first()
 
-    def create(self, db: Session, supplier: Supplier):
-        db.add(supplier)
+    def get_expiring_soon(self, db: Session, days: int = 30):
+        cutoff = date.today() + timedelta(days=days)
+        return (
+            db.query(ProductLot)
+            .join(Product)
+            .filter(
+                ProductLot.is_active == True,
+                Product.is_active == True,
+                ProductLot.expiry_date <= cutoff,
+                ProductLot.expiry_date >= date.today(),
+                ProductLot.stock > 0
+            )
+            .order_by(ProductLot.expiry_date.asc())
+            .all()
+        )
+
+    def create(self, db: Session, lot: ProductLot):
+        db.add(lot)
+        return lot
+
+    def update(self, db: Session, lot: ProductLot):
         db.commit()
-        db.refresh(supplier)
-        return supplier
-
-    def update(self, db: Session, supplier: Supplier):
-        db.commit()
-        db.refresh(supplier)
-        return supplier
+        db.refresh(lot)
+        return lot
 
 
 class ProductRepository:
 
     def get_all(self, db: Session, skip: int = 0, limit: int = 100):
-        return db.query(Product).filter(Product.is_active == True).offset(skip).limit(limit).all()
+        return (
+            db.query(Product)
+            .filter(Product.is_active == True)
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
     def get_by_id(self, db: Session, product_id: int):
         return db.query(Product).filter(Product.id == product_id).first()
@@ -54,7 +80,6 @@ class ProductRepository:
         return db.query(Product).filter(Product.code == code).first()
 
     def search(self, db: Session, query: str):
-        """HU-06: buscar por nombre o código"""
         return db.query(Product).filter(
             or_(
                 Product.name.ilike(f"%{query}%"),
@@ -74,23 +99,25 @@ class ProductRepository:
         return product
 
     def get_low_stock(self, db: Session):
-        """HU-07: productos con stock menor al mínimo"""
         return db.query(Product).filter(
             Product.is_active == True,
             Product.stock <= Product.min_stock
         ).all()
 
-    def get_expiring_soon(self, db: Session, days: int = 30):
-        """HU-07: productos próximos a vencer"""
-        cutoff = date.today() + timedelta(days=days)
-        return db.query(Product).filter(
-            Product.is_active == True,
-            Product.expiry_date != None,
-            Product.expiry_date <= cutoff
-        ).all()
+    def get_next_lot_to_sell(self, db: Session, product_id: int):
+        """FEFO: retorna el lote más próximo a vencer con stock disponible"""
+        return (
+            db.query(ProductLot)
+            .filter(
+                ProductLot.product_id == product_id,
+                ProductLot.is_active == True,
+                ProductLot.stock > 0
+            )
+            .order_by(ProductLot.expiry_date.asc())
+            .first()
+        )
 
     def adjust_stock(self, db: Session, product: Product, quantity_delta: int):
-        """HU-08: actualización automática de stock"""
         product.stock += quantity_delta
         db.commit()
         db.refresh(product)

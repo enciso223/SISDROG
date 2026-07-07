@@ -25,12 +25,6 @@ class SaleService:
         return sale
 
     def create_sale(self, db: Session, data: SaleCreate):
-        """
-        HU-01: Gestionar venta completa
-        - Valida stock por producto
-        - Calcula subtotales y total automáticamente
-        - HU-08: descuenta stock al finalizar
-        """
         if not data.items:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -40,7 +34,6 @@ class SaleService:
         sale_items = []
         total = 0.0
 
-        # Validar todos los productos antes de crear la venta
         for item_data in data.items:
             product = self.product_repo.get_by_id(db, item_data.product_id)
             if not product or not product.is_active:
@@ -48,7 +41,6 @@ class SaleService:
                     status_code=404,
                     detail=f"Producto con id {item_data.product_id} no encontrado"
                 )
-            # HU-01: validar stock suficiente
             if product.stock < item_data.quantity:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -59,12 +51,10 @@ class SaleService:
             total += subtotal
             sale_items.append((product, item_data.quantity, product.sale_price, subtotal))
 
-        # Crear la venta
         sale = Sale(total=round(total, 2), notes=data.notes)
         db.add(sale)
-        db.flush()  # obtener ID sin hacer commit todavía
+        db.flush()
 
-        # Crear ítems y HU-08: actualizar inventario
         for product, qty, unit_price, subtotal in sale_items:
             item = SaleItem(
                 sale_id=sale.id,
@@ -74,14 +64,26 @@ class SaleService:
                 subtotal=round(subtotal, 2)
             )
             db.add(item)
-            product.stock -= qty  # HU-08: descuento automático de stock
 
-        # HU-03: generar comprobante automáticamente
+            # FEFO: descontar del lote más próximo a vencer primero
+            remaining = qty
+            lots = self.product_repo.get_next_lot_to_sell(db, product.id)
+            if lots:
+                lot = lots
+                if lot.stock >= remaining:
+                    lot.stock -= remaining
+                    remaining = 0
+                else:
+                    remaining -= lot.stock
+                    lot.stock = 0
+
+            product.stock -= qty
+
         receipt_number = f"REC-{sale.id:06d}"
         receipt = SaleReceipt(
             sale_id=sale.id,
             receipt_number=receipt_number,
-            establishment_name="Droguería",
+            establishment_name="Droguería Laureano Gómez",
         )
         db.add(receipt)
         db.commit()
@@ -89,7 +91,6 @@ class SaleService:
         return sale
 
     def get_summary(self, db: Session, date_from: date = None, date_to: date = None):
-        """HU-04: resumen de ventas"""
         result = self.repo.get_summary(db, date_from, date_to)
         return {
             "total_sales": float(result.total_sales),
@@ -99,8 +100,7 @@ class SaleService:
         }
 
     def get_receipt(self, db: Session, sale_id: int):
-        """HU-03: obtener comprobante de venta"""
-        self.get_by_id(db, sale_id)  # valida que existe
+        self.get_by_id(db, sale_id)
         receipt = self.receipt_repo.get_by_sale_id(db, sale_id)
         if not receipt:
             raise HTTPException(status_code=404, detail="Comprobante no encontrado")

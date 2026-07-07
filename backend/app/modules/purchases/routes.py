@@ -5,22 +5,22 @@ from typing import List
 from app.database.database import get_db
 from app.core.security import get_current_user
 from app.modules.auth.model import User
-from app.modules.purchases.schema import PurchaseCreate, PurchaseResponse, PurchaseListResponse
-from app.modules.purchases.controller import PurchaseController
+from app.modules.purchases.schema import PurchaseCreate, PurchaseResponse
+from app.modules.purchases.service import PurchaseService
 
 router = APIRouter(prefix="/purchases", tags=["Purchases"])
 
-ctrl = PurchaseController()
+svc = PurchaseService()
 
 
-@router.get("", response_model=List[PurchaseListResponse])
+@router.get("", response_model=List[PurchaseResponse])
 def list_purchases(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return ctrl.list(db, skip, limit)
+    return svc.list_purchases(db, skip, limit)
 
 
 @router.get("/{purchase_id}", response_model=PurchaseResponse)
@@ -29,7 +29,7 @@ def get_purchase(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return ctrl.get(db, purchase_id)
+    return svc.get_purchase(db, purchase_id)
 
 
 @router.post("", response_model=PurchaseResponse, status_code=201)
@@ -38,7 +38,8 @@ def create_purchase(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return ctrl.create(db, data)
+    """Registrar compra — crea lote automáticamente con fecha de vencimiento"""
+    return svc.create_purchase(db, data)
 
 
 @router.delete("/{purchase_id}", status_code=204)
@@ -47,4 +48,4 @@ def delete_purchase(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    ctrl.delete(db, purchase_id)
+    svc.delete_purchase(db, purchase_id)
