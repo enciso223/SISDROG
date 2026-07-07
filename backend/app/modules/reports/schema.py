@@ -6,13 +6,10 @@ from datetime import date, datetime
 # ─── HU-10: Historial de compras ─────────────────────────────
 class PurchaseHistoryItem(BaseModel):
     id: int
-    product_id: int
-    product_name: str
+    supplier_id: int
+    supplier_name: str
     purchase_date: date
-    quantity: int
-    unit_price: float
     total_amount: float
-    lot_number: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
 

@@ -10,8 +10,8 @@ class ReportsController:
     def __init__(self):
         self.service = ReportsService()
 
-    def get_purchase_history(self, db, skip, limit, date_from, date_to, product_id):
-        return self.service.get_purchase_history(db, skip, limit, date_from, date_to, product_id)
+    def get_purchase_history(self, db, skip, limit, date_from, date_to, supplier_id):
+        return self.service.get_purchase_history(db, skip, limit, date_from, date_to, supplier_id)
 
     def get_financial_balance(self, db, date_from, date_to):
         return self.service.get_financial_balance(db, date_from, date_to)

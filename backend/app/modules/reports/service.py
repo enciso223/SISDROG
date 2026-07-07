@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 
 from app.modules.reports.repository import ReportsRepository
@@ -26,24 +26,21 @@ class ReportsService:
         limit: int = 100,
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
-        product_id: Optional[int] = None
+        supplier_id: Optional[int] = None
     ):
         self._validate_dates(date_from, date_to)
-        results = self.repo.get_purchase_history(db, skip, limit, date_from, date_to, product_id)
+        results = self.repo.get_purchase_history(db, skip, limit, date_from, date_to, supplier_id)
         return [
             {
                 "id": purchase.id,
-                "product_id": purchase.product_id,
-                "product_name": product_name,
+                "supplier_id": purchase.supplier_id,
+                "supplier_name": supplier_name,
                 "purchase_date": purchase.purchase_date,
-                "quantity": purchase.quantity,
-                "unit_price": purchase.unit_price,
                 "total_amount": purchase.total_amount,
-                "lot_number": purchase.lot_number,
                 "notes": purchase.notes,
                 "created_at": purchase.created_at
             }
-            for purchase, product_name in results
+            for purchase, supplier_name in results
         ]
 
     # ─── HU-12: Balance financiero ───────────────────────────
