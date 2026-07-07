@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from datetime import date
 
@@ -7,6 +7,13 @@ from datetime import date
 class CategoryCreate(BaseModel):
     name: str
     description: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v):
+        if not v.strip():
+            raise ValueError("El nombre no puede estar vacío")
+        return v.strip()
 
 
 class CategoryResponse(BaseModel):
@@ -25,6 +32,13 @@ class SupplierCreate(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     address: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v):
+        if not v.strip():
+            raise ValueError("El nombre del proveedor no puede estar vacío")
+        return v.strip()
 
 
 class SupplierUpdate(BaseModel):
@@ -65,6 +79,41 @@ class ProductCreate(BaseModel):
     category_id: Optional[int] = None
     supplier_id: Optional[int] = None
 
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v):
+        if not v.strip():
+            raise ValueError("El nombre del producto no puede estar vacío")
+        return v.strip()
+
+    @field_validator("purchase_price")
+    @classmethod
+    def purchase_price_positive(cls, v):
+        if v < 0:
+            raise ValueError("El precio de compra no puede ser negativo")
+        return v
+
+    @field_validator("sale_price")
+    @classmethod
+    def sale_price_positive(cls, v):
+        if v <= 0:
+            raise ValueError("El precio de venta debe ser mayor a 0")
+        return v
+
+    @field_validator("stock")
+    @classmethod
+    def stock_not_negative(cls, v):
+        if v < 0:
+            raise ValueError("El stock no puede ser negativo")
+        return v
+
+    @field_validator("min_stock")
+    @classmethod
+    def min_stock_not_negative(cls, v):
+        if v < 0:
+            raise ValueError("El stock mínimo no puede ser negativo")
+        return v
+
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -75,10 +124,25 @@ class ProductUpdate(BaseModel):
     sale_price: Optional[float] = None
     batch: Optional[str] = None
     expiry_date: Optional[date] = None
+    stock: Optional[int] = None
     min_stock: Optional[int] = None
     category_id: Optional[int] = None
     supplier_id: Optional[int] = None
     is_active: Optional[bool] = None
+
+    @field_validator("purchase_price")
+    @classmethod
+    def purchase_price_positive(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("El precio de compra no puede ser negativo")
+        return v
+
+    @field_validator("sale_price")
+    @classmethod
+    def sale_price_positive(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("El precio de venta debe ser mayor a 0")
+        return v
 
 
 class ProductResponse(BaseModel):
@@ -106,5 +170,3 @@ class ProductResponse(BaseModel):
 class StockAlertResponse(BaseModel):
     low_stock: list[ProductResponse]
     expiring_soon: list[ProductResponse]
-
-

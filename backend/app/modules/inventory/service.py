@@ -15,6 +15,12 @@ class CategoryService:
         return self.repo.get_all(db)
 
     def create(self, db: Session, data: CategoryCreate):
+        existing = self.repo.get_by_name(db, data.name)
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Ya existe una categoría con el nombre '{data.name}'"
+            )
         category = Category(**data.model_dump())
         return self.repo.create(db, category)
 
@@ -75,7 +81,7 @@ class ProductService:
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Ya existe un producto con ese código"
+                detail=f"Ya existe un producto con el código '{data.code}'"
             )
         product = Product(**data.model_dump())
         return self.repo.create(db, product)
@@ -99,5 +105,3 @@ class ProductService:
             "low_stock": self.repo.get_low_stock(db),
             "expiring_soon": self.repo.get_expiring_soon(db, expiry_days)
         }
-
-
