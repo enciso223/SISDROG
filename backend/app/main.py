@@ -37,3 +37,4 @@ def root():
         "message": "Pharmacy API running successfully",
         "sprint": "Sprint 3 - Reportes y Análisis"
     }
+

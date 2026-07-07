@@ -11,6 +11,7 @@ class SaleItemCreate(BaseModel):
 class SaleItemResponse(BaseModel):
     id: int
     product_id: int
+    product_name: Optional[str] = None
     quantity: int
     unit_price: float
     subtotal: float

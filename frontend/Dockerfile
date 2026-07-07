@@ -1,33 +1,31 @@
-# Etapa 1: Construcción (Build)
-FROM node:18-alpine AS build
+# Dockerfile de desarrollo para SISDROG Desktop (React Native Windows).
+#
+# NOTA IMPORTANTE:
+# React Native Windows requiere un entorno Windows con Visual Studio para compilar
+# y ejecutar la aplicación nativa de escritorio. Este contenedor Linux sirve para:
+#   - Instalar y cachear dependencias de Node.
+#   - Ejecutar el Metro bundler durante el desarrollo.
+#   - Correr lint y pruebas unitarias.
+#
+# Para compilar y ejecutar la app nativa de Windows se debe usar el host Windows:
+#   pnpm run windows
+#
+FROM node:22-alpine
+
+# Instalar pnpm de forma global.
+RUN npm install -g pnpm
+
 WORKDIR /app
 
-# Copiar archivos de dependencias e instalar
-COPY package.json package-lock.json* ./
-RUN npm install
+# Instalar dependencias nativas básicas que requieren algunos paquetes de RN.
+RUN apk add --no-cache python3 make g++
 
-# Copiar el resto del código y construir la aplicación
+# Copiar solo los manifiestos de dependencias para aprovechar la caché de Docker.
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
 COPY . .
-RUN npm run build
 
-# Etapa 2: Servir con Nginx
-FROM nginx:alpine
+EXPOSE 8081
 
-# Eliminar la configuración por defecto de Nginx
-RUN rm /etc/nginx/conf.d/default.conf
-
-# Crear configuración específica para React Router
-RUN echo 'server { \
-    listen 80; \
-    location / { \
-        root /usr/share/nginx/html; \
-        index index.html index.htm; \
-        try_files $uri $uri/ /index.html; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
-
-# Copiar los archivos construidos
-COPY --from=build /app/build /usr/share/nginx/html
-
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["pnpm", "start"]
