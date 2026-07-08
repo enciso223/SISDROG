@@ -113,6 +113,7 @@ class ProductUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     presentation: Optional[str] = None
+    lots: Optional[List[ProductLotCreate]] = None
     gramaje: Optional[str] = None
     laboratory: Optional[str] = None
     purchase_price: Optional[float] = None

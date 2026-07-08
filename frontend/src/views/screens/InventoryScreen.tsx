@@ -13,6 +13,7 @@ import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
   Text,
+  Alert,
   FlatList,
   ActivityIndicator,
   TouchableOpacity,
@@ -52,6 +53,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack: _onBack
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [serverError, setServerError] = useState<{field: string; message: string; ts: number} | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -81,20 +83,61 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack: _onBack
   /* ─── Handlers ─── */
   const handleOpenModal = (product?: Product) => {
     setEditingProduct(product || null);
+    setServerError(null);
     setIsModalVisible(true);
   };
 
   const handleSaveProduct = useCallback(
     async (data: any, id?: number) => {
+      const performSave = async () => {
+        try {
+          if (id) {
+            await updateProduct(id, data);
+          } else {
+            await createProduct(data);
+          }
+          setIsModalVisible(false);
+          // Refrescar productos completos del backend para que los lotes y
+          // fechas de vencimiento estén siempre actualizados al volver a editar.
+          await fetchProducts();
+          fetchAlerts();
+        } catch (err: any) {
+          const status = err?.response?.status;
+          const detail = err?.response?.data?.detail || '';
+          if (status === 409) {
+            setServerError({field: 'code', message: 'Ya existe este código', ts: Date.now()});
+            Alert.alert(
+              'Código duplicado',
+              `Ya existe un producto con ese código. Usa un código diferente.\n\n${detail}`,
+            );
+          } else if (status === 422) {
+            Alert.alert(
+              'Datos inválidos',
+              'Revisa los campos del formulario. Algunos valores no son válidos.',
+            );
+          } else {
+            Alert.alert(
+              'Error al guardar',
+              err instanceof Error ? err.message : 'No se pudo guardar el producto.',
+            );
+          }
+        }
+      };
+
       if (id) {
-        await updateProduct(id, data);
+        Alert.alert(
+          'Confirmar actualización',
+          '¿Quieres actualizar los datos del producto?',
+          [
+            {text: 'Cancelar', style: 'cancel'},
+            {text: 'Actualizar', onPress: performSave},
+          ],
+        );
       } else {
-        await createProduct(data);
+        performSave();
       }
-      setIsModalVisible(false);
-      fetchAlerts();
     },
-    [updateProduct, createProduct, fetchAlerts],
+    [updateProduct, createProduct, fetchProducts, fetchAlerts],
   );
 
   const handleDeleteProduct = useCallback(
@@ -274,6 +317,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack: _onBack
         onClose={() => setIsModalVisible(false)}
         onSave={handleSaveProduct}
         product={editingProduct}
+        serverError={serverError}
       />
     </View>
   );

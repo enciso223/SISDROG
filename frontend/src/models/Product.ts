@@ -11,6 +11,7 @@ export interface Product {
   description?: string;
   laboratory?: string;
   presentation?: string;
+  gramaje?: string;
   stock: number;
   minStock?: number;
   salePrice: number;
@@ -20,6 +21,12 @@ export interface Product {
   iva?: number;
   isActive?: boolean;
   supplierId?: number;
+  supplierName?: string;
+  contactName?: string;
+  phone?: string;
+  address?: string;
+  lotNumber?: string;
+  purchaseDate?: string;
   origin?: ProductOrigin;
   createdAt?: string;
   updatedAt?: string;
@@ -31,6 +38,7 @@ export interface ProductCreate {
   description?: string;
   laboratory?: string;
   presentation?: string;
+  gramaje?: string;
   stock: number;
   minStock?: number;
   salePrice: number;
@@ -38,5 +46,11 @@ export interface ProductCreate {
   expirationDate?: string;
   iva?: number;
   supplierId?: number;
+  supplierName?: string;
+  contactName?: string;
+  phone?: string;
+  address?: string;
+  lotNumber?: string;
+  purchaseDate?: string;
   origin?: ProductOrigin;
 }
