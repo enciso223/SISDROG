@@ -12,7 +12,10 @@ import {UserCreate, User} from '../models';
 import {setSessionToken, clearSession} from '../security';
 
 export interface AuthResponse {
-  user: User;
+  user?: User;
+  access_token?: string;
+  token_type?: string;
+  // fallback para camelCase
   accessToken?: string;
   tokenType?: string;
 }
@@ -31,9 +34,13 @@ class AuthService {
 
   async login(data: {email: string; password: string}): Promise<AuthResponse> {
     const response = await apiClient.post<AuthResponse>('/auth/login', data);
-    const {accessToken, tokenType} = response.data;
-    if (accessToken) {
-      setSessionToken(accessToken, tokenType ?? 'Bearer');
+    
+    // El backend puede devolver en snake_case (access_token) o camelCase (accessToken)
+    const token = response.data.access_token || response.data.accessToken;
+    const type = response.data.token_type || response.data.tokenType || 'Bearer';
+    
+    if (token) {
+      setSessionToken(token, type);
     }
     return response.data;
   }
