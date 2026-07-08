@@ -4,3 +4,4 @@ export {inventoryService} from './InventoryService';
 export {salesService} from './SalesService';
 export {donationsService} from './DonationsService';
 export {mockProducts, mockUser, mockSales, mockAlerts} from './mockData';
+export {expensesService} from './ExpensesService';

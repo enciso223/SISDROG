@@ -18,6 +18,7 @@ import {
   HomeScreen,
   InventoryScreen,
   SalesScreen,
+  ExpensesScreen,
   LoginScreen,
   RegisterScreen,
 } from './src/views/screens';
@@ -114,8 +115,9 @@ function App(): React.JSX.Element {
         return <InventoryScreen onBack={() => setCurrentScreen('home')} />;
       case 'sales':
         return <SalesScreen />;
-      case 'purchases':
       case 'expenses':
+        return <ExpensesScreen />;
+      case 'purchases':
       case 'reports':
       case 'settings':
         return <HomeScreen onNavigate={setCurrentScreen} />;
