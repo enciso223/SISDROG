@@ -17,6 +17,8 @@ interface ReceiptModalProps {
   visible: boolean;
   saleId: number | null;
   demoSale: Sale | null;
+  /** Comprobante generado localmente (p. ej. donaciones, sin endpoint de recibo). */
+  localReceipt?: SaleReceipt | null;
   onClose: () => void;
 }
 
@@ -24,6 +26,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   visible,
   saleId,
   demoSale,
+  localReceipt,
   onClose,
 }) => {
   const [receipt, setReceipt] = useState<SaleReceipt | null>(null);
@@ -31,12 +34,20 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Comprobante local (donaciones): se muestra sin llamar al backend.
+    if (visible && localReceipt) {
+      setReceipt(localReceipt);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     const fetchReceipt = async () => {
       if (!saleId) return;
-      
+
       setLoading(true);
       setError(null);
-      
+
       try {
         if (DEMO_MODE && saleId === 999 && demoSale) {
           // Mock receipt for demo mode
@@ -64,11 +75,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
     if (visible && saleId) {
       fetchReceipt();
-    } else {
+    } else if (!visible) {
       setReceipt(null);
       setError(null);
     }
-  }, [visible, saleId, demoSale]);
+  }, [visible, saleId, demoSale, localReceipt]);
 
   const formatDate = (dateString: string) => {
     try {
@@ -134,6 +145,13 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                   )}
                 </View>
 
+                {receipt.sale.isDonation && (
+                  <View style={styles.donationBadge}>
+                    <Icon name="gift" size={16} color="#0F766E" />
+                    <Text style={styles.donationBadgeText}>DONACIÓN</Text>
+                  </View>
+                )}
+
                 <View style={styles.divider} />
 
                 {/* Info de la Venta */}
@@ -186,7 +204,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
                 {/* Footer */}
                 <View style={styles.ticketFooter}>
-                  <Text style={styles.footerText}>¡Gracias por su compra!</Text>
+                  <Text style={styles.footerText}>
+                    {receipt.sale.isDonation
+                      ? 'Comprobante de donación · Sin valor comercial'
+                      : '¡Gracias por su compra!'}
+                  </Text>
                 </View>
               </ScrollView>
 
@@ -260,6 +282,25 @@ const styles = StyleSheet.create({
     color: '#4B5563',
     textAlign: 'center',
     marginTop: 4,
+  },
+  donationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: '#CCFBF1',
+    borderWidth: 1,
+    borderColor: '#5EEAD4',
+  },
+  donationBadgeText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    color: '#0F766E',
   },
   divider: {
     height: 1,

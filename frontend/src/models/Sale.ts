@@ -23,6 +23,8 @@ export interface Sale {
   paymentMethod?: PaymentMethod;
   soldBy?: string;
   createdAt?: string;
+  /** true cuando la "venta" es en realidad una donación de salida (total $0). */
+  isDonation?: boolean;
 }
 
 export enum PaymentMethod {

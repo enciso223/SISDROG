@@ -118,7 +118,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           minStock: product.minStock || 5,
           expirationDate: product.expirationDate || '',
           supplierId: product.supplierId,
-          origin: product.origin || 'Compra',
+          origin: product.origin || (product.purchasePrice === 0 ? 'Donación' : 'Compra'),
         });
         setDisplayDate(ISOToDisplay(product.expirationDate));
       } else {
@@ -142,6 +142,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   }, [visible, product]);
 
   const handleChange = (field: keyof ProductCreate, value: string | number | undefined) => {
+    if (field === 'origin' && value === 'Donación') {
+      setFormData(prev => ({...prev, origin: 'Donación', purchasePrice: 0}));
+      setErrors(prev => ({...prev, origin: '', purchasePrice: ''}));
+      return;
+    }
     setFormData(prev => ({...prev, [field]: value}));
     if (errors[field as string]) {
       setErrors(prev => ({...prev, [field]: ''}));
@@ -347,6 +352,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                       handleChange('purchasePrice', parseFloat(v) || 0)
                     }
                     error={errors.purchasePrice}
+                    editable={formData.origin !== 'Donación'}
                   />
                 </View>
                 <View style={styles.col}>

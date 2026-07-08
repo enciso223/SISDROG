@@ -36,3 +36,7 @@ windows/*/ARM/
 windows/*/ARM64/
 *.pfx
 *.AppxManifest.xml
+
+# Local caching and build logs
+.pnpm-store/
+msbuild.binlog
