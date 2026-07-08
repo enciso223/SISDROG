@@ -3,7 +3,7 @@
  * Activa DEMO_MODE en src/config/constants.ts para usar estos mocks.
  */
 
-import {User, UserRole, Product, Sale, PaymentMethod, InventoryAlertsResponse} from '../models';
+import {User, UserRole, Product, Sale, PaymentMethod, InventoryAlertsResponse, Purchase} from '../models';
 
 export const mockUser: User = {
   id: 1,
@@ -259,3 +259,68 @@ export const mockAlerts: InventoryAlertsResponse = {
     mockProducts[1],
   ],
 };
+
+/**
+ * HU "Consultar historial de compras": datos mock del historial.
+ * Ya vienen enriquecidos con nombre de producto y proveedor para el modo demo.
+ */
+export const mockPurchases: Purchase[] = [
+  {
+    id: 1,
+    productId: 14,
+    productName: 'Paracetamol 500mg',
+    productCode: 'MED-001',
+    supplierName: 'Distribuidora Genfar',
+    purchaseDate: '2026-06-28',
+    quantity: 100,
+    unitPrice: 2800,
+    totalAmount: 280000,
+    lotNumber: 'L-2026-0628',
+    notes: 'Compra mensual de rotación alta.',
+    isActive: true,
+    createdAt: '2026-06-28T10:15:00Z',
+  },
+  {
+    id: 2,
+    productId: 102,
+    productName: 'Vitamina C 1000mg',
+    productCode: 'MED-003',
+    supplierName: 'Bayer S.A.',
+    purchaseDate: '2026-06-15',
+    quantity: 60,
+    unitPrice: 3900,
+    totalAmount: 234000,
+    lotNumber: 'L-2026-0615',
+    isActive: true,
+    createdAt: '2026-06-15T09:00:00Z',
+  },
+  {
+    id: 3,
+    productId: 45,
+    productName: 'Ibuprofeno 400mg',
+    productCode: 'MED-004',
+    supplierName: 'Laboratorios MK',
+    purchaseDate: '2026-05-30',
+    quantity: 80,
+    unitPrice: 1800,
+    totalAmount: 144000,
+    lotNumber: 'L-2026-0530',
+    notes: 'Reposición por stock bajo.',
+    isActive: true,
+    createdAt: '2026-05-30T14:20:00Z',
+  },
+  {
+    id: 4,
+    productId: 67,
+    productName: 'Omeprazol 20mg',
+    productCode: 'MED-006',
+    supplierName: 'Distribuidora Genfar',
+    purchaseDate: '2026-05-12',
+    quantity: 50,
+    unitPrice: 2500,
+    totalAmount: 125000,
+    lotNumber: 'L-2026-0512',
+    isActive: true,
+    createdAt: '2026-05-12T11:05:00Z',
+  },
+];
