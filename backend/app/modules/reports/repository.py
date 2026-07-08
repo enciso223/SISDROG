@@ -6,8 +6,7 @@ from typing import Optional
 from app.modules.sales.model import Sale, SaleItem
 from app.modules.expenses.model import Expense
 from app.modules.purchases.model import Purchase
-from app.modules.inventory.model import Product, Supplier
-
+from app.modules.inventory.model import Product
 
 class ReportsRepository:
 
@@ -22,8 +21,8 @@ class ReportsRepository:
         supplier_id: Optional[int] = None
     ):
         query = (
-            db.query(Purchase, Supplier.name.label("supplier_name"))
-            .join(Supplier, Purchase.supplier_id == Supplier.id)
+            db.query(Purchase, Product.supplier_name.label("supplier_name"))
+            .outerjoin(Product, Purchase.product_id == Product.id)
             .filter(Purchase.is_active == True)
         )
         if date_from:
@@ -31,7 +30,7 @@ class ReportsRepository:
         if date_to:
             query = query.filter(Purchase.purchase_date <= date_to)
         if supplier_id:
-            query = query.filter(Purchase.supplier_id == supplier_id)
+            pass # El filtrado por supplier_id ya no aplica (proveedor embebido en producto)
         return query.order_by(Purchase.purchase_date.desc()).offset(skip).limit(limit).all()
 
     # ─── HU-12: Balance financiero ───────────────────────────

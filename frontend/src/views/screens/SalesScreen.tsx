@@ -17,9 +17,10 @@ import {
   Platform,
   UIManager,
   Image,
+  StyleSheet,
 } from 'react-native';
 import {usePOSController} from '../../controllers';
-import {Product, Sale} from '../../models';
+import {Product, Sale, SaleReceipt} from '../../models';
 import {TAX_RATE} from '../../config/constants';
 import {Icon, ReceiptModal} from '../components';
 import {PAYMENT_ICON} from '../../assets/paymentIcon';
@@ -125,7 +126,7 @@ const ProductCard: React.FC<ProductCardProps> = ({product, quantityInCart, onPre
   let expirationAlert = null;
   let isExpired = false;
   let isExpiringSoon = false;
-  
+
   if (product.expirationDate) {
     // Convertir de formato YYYY-MM-DD o YYYY/MM/DD
     const expDate = new Date(product.expirationDate);
@@ -178,11 +179,11 @@ const ProductCard: React.FC<ProductCardProps> = ({product, quantityInCart, onPre
           {product.laboratory ?? 'Genérico'}
         </Text>
         {expirationAlert && (
-          <Text 
+          <Text
             style={[
-              styles.productLab, 
+              styles.productLab,
               isExpired ? {color: '#EF4444', fontWeight: 'bold'} : isExpiringSoon ? {color: '#F59E0B', fontWeight: 'bold'} : null
-            ]} 
+            ]}
             numberOfLines={1}>
             {expirationAlert}
           </Text>
@@ -259,6 +260,8 @@ export const SalesScreen: React.FC = () => {
     tax,
     discount,
     total,
+    isDonation,
+    setIsDonation,
     filteredProducts,
     searchQuery,
     setSearchQuery,
@@ -275,9 +278,10 @@ export const SalesScreen: React.FC = () => {
   const [editingDiscount, setEditingDiscount] = useState(false);
   const [discountInput, setDiscountInput] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(true);
-  
+
   const [lastSaleId, setLastSaleId] = useState<number | null>(null);
   const [demoSale, setDemoSale] = useState<Sale | null>(null);
+  const [localReceipt, setLocalReceipt] = useState<SaleReceipt | null>(null);
   const [isReceiptVisible, setIsReceiptVisible] = useState(false);
 
   // Wrappers con animación
@@ -333,8 +337,25 @@ export const SalesScreen: React.FC = () => {
     try {
       const sale = await finalizeSale();
       if (sale) {
-        setLastSaleId(sale.id ?? null);
-        setDemoSale(sale);
+        if (sale.isDonation) {
+          // La donación no tiene comprobante en el backend: lo generamos
+          // localmente para mostrarlo, marcado como DONACIÓN con total $0.
+          const receipt: SaleReceipt = {
+            id: 0,
+            sale_id: 0,
+            receipt_number: `DON-${Date.now().toString().slice(-6)}`,
+            establishment_name: 'Droguería Laureano Gómez',
+            created_at: sale.createdAt ?? new Date().toISOString(),
+            sale,
+          };
+          setLocalReceipt(receipt);
+          setLastSaleId(null);
+          setDemoSale(null);
+        } else {
+          setLocalReceipt(null);
+          setLastSaleId(sale.id ?? null);
+          setDemoSale(sale);
+        }
         setIsReceiptVisible(true);
       } else {
         clearCart();
@@ -523,12 +544,44 @@ export const SalesScreen: React.FC = () => {
           </ScrollView>
 
           <View style={styles.cartSummaryWrapper}>
+            {/* ── Toggle: registrar la venta actual como donación ── */}
+            <Pressable
+              onPress={() => setIsDonation(!isDonation)}
+              style={({pressed}) => [
+                donationToggleStyles.row,
+                isDonation && donationToggleStyles.rowActive,
+                pressed && {opacity: 0.8},
+              ]}>
+              <View
+                style={[
+                  donationToggleStyles.checkbox,
+                  isDonation && donationToggleStyles.checkboxActive,
+                ]}>
+                {isDonation && <Icon name="gift" size={13} color="#FFFFFF" />}
+              </View>
+              <View style={{flex: 1}}>
+                <Text style={donationToggleStyles.title}>Donación (salida)</Text>
+                <Text style={donationToggleStyles.subtitle}>
+                  Total a pagar $0 · descuenta inventario · genera comprobante
+                </Text>
+              </View>
+            </Pressable>
+
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal</Text>
               <Text style={styles.summaryValue}>{formatCurrency(subtotal)}</Text>
             </View>
 
-            {editingDiscount ? (
+            {isDonation ? (
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, styles.discountLabel]}>
+                  Donación
+                </Text>
+                <Text style={[styles.summaryValue, styles.discountValue]}>
+                  -{formatCurrency(subtotal)}
+                </Text>
+              </View>
+            ) : editingDiscount ? (
               <View style={styles.discountInputRow}>
                 <Text style={[styles.summaryLabel, styles.discountLabel]}>
                   Descuento
@@ -588,6 +641,13 @@ export const SalesScreen: React.FC = () => {
                 activeOpacity={0.9}>
                 {isProcessing ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : isDonation ? (
+                  <>
+                    <Icon name="gift" size={22} color="#FFFFFF" />
+                    <Text style={styles.checkoutButtonText}>
+                      Registrar Donación
+                    </Text>
+                  </>
                 ) : (
                   <>
                     <Image source={{uri: PAYMENT_ICON}} style={{width: 24, height: 24}} resizeMode="contain" />
@@ -607,11 +667,58 @@ export const SalesScreen: React.FC = () => {
         visible={isReceiptVisible}
         saleId={lastSaleId}
         demoSale={demoSale}
+        localReceipt={localReceipt}
         onClose={() => {
           setIsReceiptVisible(false);
+          setLocalReceipt(null);
           clearCart();
         }}
       />
     </View>
   );
 };
+
+/* ─── Estilos del toggle de donación (inline por reuso) ─── */
+const DONATION_ACCENT = '#0D9488';
+const donationToggleStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    marginBottom: 12,
+  },
+  rowActive: {
+    borderColor: DONATION_ACCENT,
+    backgroundColor: '#F0FDFA',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxActive: {
+    borderColor: DONATION_ACCENT,
+    backgroundColor: DONATION_ACCENT,
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  subtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+});

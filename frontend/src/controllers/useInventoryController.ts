@@ -5,7 +5,7 @@
  */
 
 import {useState, useCallback} from 'react';
-import {inventoryService, mockProducts, mockAlerts} from '../services';
+import {inventoryService, mockProducts, mockAlerts, donationsService} from '../services';
 import {Product, ProductCreate, InventoryAlertsResponse} from '../models';
 import {DEMO_MODE} from '../config/constants';
 
@@ -99,7 +99,28 @@ export const useInventoryController = (): UseInventoryControllerReturn => {
           };
           setProducts(prev => [...prev, newProduct]);
         } else {
+          const isDonation = data.origin === 'Donación';
+          const originalStock = data.stock;
+
+          // Si es donación, registramos el producto con 0 de stock inicial
+          // para no duplicar el inventario, y luego registramos la entrada.
+          if (isDonation && originalStock > 0) {
+            data.stock = 0;
+          }
+
           const newProduct = await inventoryService.create(data);
+
+          // Registrar la donación recibida
+          if (isDonation && originalStock > 0 && newProduct.id) {
+            await donationsService.create({
+              donationType: 'received',
+              items: [{ productId: newProduct.id, quantity: originalStock }],
+              notes: 'Donación recibida al registrar nuevo producto',
+            });
+            // Restauramos el stock localmente para la UI
+            newProduct.stock = originalStock;
+          }
+
           setProducts(prev => [...prev, newProduct]);
         }
       } catch (err) {

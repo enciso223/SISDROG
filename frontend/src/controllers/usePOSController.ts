@@ -3,8 +3,13 @@
  */
 
 import {useState, useCallback, useEffect, useMemo} from 'react';
-import {inventoryService, salesService, mockProducts} from '../services';
-import {Product, SaleItem, SaleCreate, PaymentMethod} from '../models';
+import {
+  inventoryService,
+  salesService,
+  donationsService,
+  mockProducts,
+} from '../services';
+import {Product, Sale, SaleItem, SaleCreate, PaymentMethod} from '../models';
 import {DEMO_MODE, TAX_RATE} from '../config/constants';
 
 export interface CartItem extends SaleItem {
@@ -22,6 +27,8 @@ export interface UsePOSControllerReturn {
   tax: number;
   discount: number;
   total: number;
+  isDonation: boolean;
+  setIsDonation: (value: boolean) => void;
   filteredProducts: Product[];
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -44,6 +51,9 @@ export const usePOSController = (): UsePOSControllerReturn => {
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
+  // Cuando está activo, la venta actual se registra como donación de salida
+  // (el precio a pagar es $0 y el inventario disminuye vía /donations).
+  const [isDonation, setIsDonation] = useState(false);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -160,6 +170,7 @@ export const usePOSController = (): UsePOSControllerReturn => {
   const clearCart = useCallback(() => {
     setCart([]);
     setDiscount(0);
+    setIsDonation(false);
   }, []);
 
   const subtotal = useMemo(
@@ -170,8 +181,9 @@ export const usePOSController = (): UsePOSControllerReturn => {
   const tax = useMemo(() => subtotal * TAX_RATE, [subtotal]);
 
   const total = useMemo(
-    () => subtotal + tax - discount,
-    [subtotal, tax, discount],
+    // En una donación de salida el precio a pagar siempre es $0.
+    () => (isDonation ? 0 : subtotal + tax - discount),
+    [subtotal, tax, discount, isDonation],
   );
 
   const finalizeSale = useCallback(
@@ -180,6 +192,41 @@ export const usePOSController = (): UsePOSControllerReturn => {
     ): Promise<Sale | undefined> => {
       if (cart.length === 0) {
         throw new Error('El carrito está vacío');
+      }
+
+      // ── Donación de salida ─────────────────────────────────────────────
+      // Se registra vía /donations (donation_type = 'delivered'), lo que
+      // disminuye el inventario. El precio a pagar es $0 y de todas formas
+      // se genera un comprobante marcado como donación.
+      if (isDonation) {
+        if (!DEMO_MODE) {
+          await donationsService.create({
+            donationType: 'delivered',
+            items: cart.map(item => ({
+              productId: item.productId,
+              quantity: item.quantity,
+            })),
+            notes: 'Donación entregada desde punto de venta',
+          });
+        }
+
+        const donationSale: Sale = {
+          id: undefined,
+          items: cart.map(item => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: 0,
+            subtotal: 0,
+            productName: item.productName,
+          })),
+          subtotal: 0,
+          tax: 0,
+          total: 0,
+          isDonation: true,
+          createdAt: new Date().toISOString(),
+        };
+        clearCart();
+        return donationSale;
       }
 
       const saleData: SaleCreate = {
@@ -217,7 +264,7 @@ export const usePOSController = (): UsePOSControllerReturn => {
       clearCart();
       return sale;
     },
-    [cart, clearCart, subtotal, tax, total],
+    [cart, clearCart, subtotal, tax, total, isDonation],
   );
 
   return {
@@ -231,6 +278,8 @@ export const usePOSController = (): UsePOSControllerReturn => {
     tax,
     discount,
     total,
+    isDonation,
+    setIsDonation,
     filteredProducts,
     searchQuery,
     setSearchQuery,
