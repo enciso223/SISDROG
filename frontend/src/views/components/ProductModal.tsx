@@ -23,6 +23,7 @@ interface ProductModalProps {
   onClose: () => void;
   onSave: (data: ProductCreate, id?: number) => void;
   product?: Product | null; // Si es null, estamos creando. Si tiene valor, estamos editando.
+  serverError?: {field: string; message: string; ts: number} | null;
 }
 
 /* ─── Paleta ─── */
@@ -97,11 +98,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   onClose,
   onSave,
   product,
+  serverError,
 }) => {
   const [formData, setFormData] = useState<Partial<ProductCreate>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
-  // Estado visual de la fecha (DD/MM/AAAA) independiente del ISO almacenado
+  // Estado visual de la fecha de vencimiento (DD/MM/AAAA)
   const [displayDate, setDisplayDate] = useState('');
+  // Estado visual de la fecha de compra (DD/MM/AAAA)
+  const [displayPurchaseDate, setDisplayPurchaseDate] = useState('');
 
   useEffect(() => {
     if (visible) {
@@ -111,35 +115,56 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           name: product.name,
           description: product.description || '',
           presentation: product.presentation || '',
+          gramaje: product.gramaje || '',
           laboratory: product.laboratory || '',
           purchasePrice: product.purchasePrice,
           salePrice: product.salePrice,
           stock: product.stock,
           minStock: product.minStock || 5,
           expirationDate: product.expirationDate || '',
-          supplierId: product.supplierId,
+          supplierName: product.supplierName || '',
+          contactName: product.contactName || '',
+          phone: product.phone || '',
+          address: product.address || '',
+          lotNumber: product.lotNumber || '',
+          purchaseDate: product.purchaseDate || '',
           origin: product.origin || (product.purchasePrice === 0 ? 'Donación' : 'Compra'),
         });
         setDisplayDate(ISOToDisplay(product.expirationDate));
+        setDisplayPurchaseDate(ISOToDisplay(product.purchaseDate));
       } else {
         setFormData({
           code: '',
           name: '',
           description: '',
           presentation: '',
+          gramaje: '',
           laboratory: '',
           purchasePrice: 0,
           salePrice: 0,
           stock: 0,
           minStock: 5,
           expirationDate: '',
+          supplierName: '',
+          contactName: '',
+          phone: '',
+          address: '',
+          lotNumber: '',
+          purchaseDate: '',
           origin: 'Compra',
         });
         setDisplayDate('');
+        setDisplayPurchaseDate('');
       }
       setErrors({});
     }
   }, [visible, product]);
+
+  useEffect(() => {
+    if (serverError) {
+      setErrors(prev => ({...prev, [serverError.field]: serverError.message}));
+    }
+  }, [serverError]);
 
   const handleChange = (field: keyof ProductCreate, value: string | number | undefined) => {
     if (field === 'origin' && value === 'Donación') {
@@ -163,6 +188,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     if (errors.expirationDate) {
       setErrors(prev => ({...prev, expirationDate: ''}));
     }
+  };
+
+  /** Maneja la entrada de fecha de compra con máscara automática DD/MM/AAAA */
+  const handlePurchaseDateChange = (raw: string) => {
+    const masked = maskDate(raw);
+    setDisplayPurchaseDate(masked);
+    const iso = displayToISO(masked);
+    setFormData(prev => ({...prev, purchaseDate: iso || masked}));
   };
 
   const validate = () => {
@@ -331,6 +364,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                     onChangeText={v => handleChange('laboratory', v)}
                   />
                 </View>
+                <View style={styles.col}>
+                  <Input
+                    label="Gramaje"
+                    placeholder="Ej. 500mg, 1g"
+                    value={formData.gramaje}
+                    onChangeText={v => handleChange('gramaje', v)}
+                  />
+                </View>
               </View>
             </SectionCard>
 
@@ -391,7 +432,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             <SectionHeader
               icon="package"
               title="Inventario y Lote"
-              subtitle="Cantidades, stock mínimo y caducidad"
+              subtitle="Cantidades, stock mínimo, lote y caducidad"
             />
             <SectionCard>
               <View style={styles.row}>
@@ -420,7 +461,29 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 </View>
                 <View style={styles.col}>
                   <Input
-                    label="Fecha de Vencimiento"
+                    label="Número de Lote *"
+                    placeholder="Ej. LOT-2024-001"
+                    value={formData.lotNumber}
+                    onChangeText={v => handleChange('lotNumber', v)}
+                    error={errors.lotNumber}
+                  />
+                </View>
+              </View>
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Input
+                    label="Fecha de Compra *"
+                    placeholder="DD/MM/AAAA"
+                    keyboardType="numeric"
+                    value={displayPurchaseDate}
+                    onChangeText={handlePurchaseDateChange}
+                    maxLength={10}
+                    error={errors.purchaseDate}
+                  />
+                </View>
+                <View style={styles.col}>
+                  <Input
+                    label="Fecha de Vencimiento *"
                     placeholder="DD/MM/AAAA"
                     keyboardType="numeric"
                     value={displayDate}
@@ -436,22 +499,46 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             <SectionHeader
               icon="purchases"
               title="Proveedor"
-              subtitle="Relación con el proveedor (opcional)"
+              subtitle="Información del proveedor (opcional)"
             />
             <SectionCard>
               <View style={styles.row}>
-                <View style={[styles.col, {maxWidth: '50%'}]}>
+                <View style={styles.col}>
                   <Input
-                    label="ID Proveedor"
+                    label="Nombre Proveedor"
                     placeholder="Opcional"
-                    keyboardType="numeric"
-                    value={formData.supplierId?.toString() || ''}
-                    onChangeText={v =>
-                      handleChange(
-                        'supplierId',
-                        parseInt(v, 10) || undefined,
-                      )
-                    }
+                    value={formData.supplierName}
+                    onChangeText={v => handleChange('supplierName', v)}
+                  />
+                </View>
+                <View style={styles.col}>
+                  <Input
+                    label="Nombre Contacto *"
+                    placeholder="Persona de contacto"
+                    value={formData.contactName}
+                    onChangeText={v => handleChange('contactName', v)}
+                    error={errors.contactName}
+                  />
+                </View>
+              </View>
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Input
+                    label="Teléfono *"
+                    placeholder="Número de teléfono"
+                    keyboardType="phone-pad"
+                    value={formData.phone}
+                    onChangeText={v => handleChange('phone', v)}
+                    error={errors.phone}
+                  />
+                </View>
+                <View style={[styles.col, {flex: 2}]}>
+                  <Input
+                    label="Dirección *"
+                    placeholder="Dirección del proveedor"
+                    value={formData.address}
+                    onChangeText={v => handleChange('address', v)}
+                    error={errors.address}
                   />
                 </View>
               </View>

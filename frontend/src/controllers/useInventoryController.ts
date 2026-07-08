@@ -103,14 +103,15 @@ export const useInventoryController = (): UseInventoryControllerReturn => {
           const originalStock = data.stock;
 
           // Si es donación, registramos el producto con 0 de stock inicial
-          // para no duplicar el inventario, y luego registramos la entrada.
+          // para no duplicar el inventario; el lote también debe tener 0 aquí
+          // ya que el stock real lo pondrá la donación recibida.
           if (isDonation && originalStock > 0) {
-            data.stock = 0;
+            data = {...data, stock: 0};
           }
 
           const newProduct = await inventoryService.create(data);
 
-          // Registrar la donación recibida
+          // Registrar la donación recibida — esto actualiza el stock en BD
           if (isDonation && originalStock > 0 && newProduct.id) {
             await donationsService.create({
               donationType: 'received',

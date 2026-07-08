@@ -137,8 +137,27 @@ class ProductService:
 
     def update(self, db: Session, product_id: int, data: ProductUpdate):
         product = self.get_by_id(db, product_id)
-        for field, value in data.model_dump(exclude_unset=True).items():
+        
+        update_data = data.model_dump(exclude_unset=True)
+        lots_data = update_data.pop("lots", None)
+        
+        for field, value in update_data.items():
             setattr(product, field, value)
+            
+        if lots_data is not None:
+            # Eliminar lotes existentes para reemplazarlos
+            for existing_lot in product.lots:
+                db.delete(existing_lot)
+            db.flush()
+            
+            total_stock = 0
+            for lot_data in lots_data:
+                lot = ProductLot(product_id=product.id, **lot_data)
+                db.add(lot)
+                total_stock += lot.stock
+                
+            product.stock = total_stock
+
         return self.repo.update(db, product)
 
     def delete(self, db: Session, product_id: int):
