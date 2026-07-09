@@ -21,6 +21,23 @@ export interface TopProductsResponse {
   date_to?: string;
 }
 
+export interface InventoryValueItem {
+  product_id: number;
+  product_name: string;
+  stock: number;
+  purchase_price: number;
+  sale_price: number;
+  purchase_value: number;
+  sale_value: number;
+}
+
+export interface InventoryValueResponse {
+  products: InventoryValueItem[];
+  total_purchase_value: number;
+  total_sale_value: number;
+  potential_profit: number;
+}
+
 export interface ReportsFilters {
   dateFrom?: string;
   dateTo?: string;
@@ -49,6 +66,12 @@ class ReportsService {
     const url = `/reports/top-products?${qs}`;
     
     const response = await apiClient.get<TopProductsResponse>(url);
+    return response.data;
+  }
+
+  async getInventoryValue(): Promise<InventoryValueResponse> {
+    const url = `/reports/inventory-value`;
+    const response = await apiClient.get<InventoryValueResponse>(url);
     return response.data;
   }
 }

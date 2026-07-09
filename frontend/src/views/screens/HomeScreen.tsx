@@ -13,16 +13,13 @@ import {
 import {Button, ReceiptModal} from '../components';
 import type {AppScreen} from '../components/Sidebar';
 import {salesService} from '../../services/SalesService';
-import {reportsService, TopProductItem} from '../../services/ReportsService';
+import {reportsService, TopProductItem, InventoryValueResponse} from '../../services/ReportsService';
 import {Sale} from '../../models';
 import {homeStyles as styles} from './HomeScreen.styles';
 
 interface HomeScreenProps {
   onNavigate: (screen: AppScreen) => void;
 }
-
-// Datos estáticos temporales
-const STATIC_INVENTORY_VALUE = 4550000;
 
 const formatCurrency = (amount: number) => {
   const intPart = Math.floor(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -49,12 +46,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate}) => {
   const [loadingTopProducts, setLoadingTopProducts] = useState(true);
   const [rankingPeriod, setRankingPeriod] = useState<number | 'all'>(30);
 
+  // Valor de inventario
+  const [inventoryValue, setInventoryValue] = useState<InventoryValueResponse | null>(null);
+  const [loadingInventoryValue, setLoadingInventoryValue] = useState(true);
+
   // Estado para el modal de recibo
   const [isReceiptVisible, setIsReceiptVisible] = useState(false);
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchSales();
+    fetchInventoryValue();
   }, []);
 
   useEffect(() => {
@@ -66,7 +68,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate}) => {
       setLoadingSales(true);
       const data = await salesService.getAll();
       
-      // Filtrar últimos 30 días y ordenar descendente por fecha
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
@@ -102,6 +103,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate}) => {
       console.error('Error fetching top products:', error);
     } finally {
       setLoadingTopProducts(false);
+    }
+  };
+
+  const fetchInventoryValue = async () => {
+    try {
+      setLoadingInventoryValue(true);
+      const data = await reportsService.getInventoryValue();
+      setInventoryValue(data);
+    } catch (error) {
+      console.error('Error fetching inventory value:', error);
+    } finally {
+      setLoadingInventoryValue(false);
     }
   };
 
@@ -197,18 +210,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate}) => {
             )}
           </View>
 
-          {/* Valor del Inventario (Estático por ahora) */}
+          {/* Valor del Inventario */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Valor del Inventario</Text>
-            <View style={styles.inventoryValueContainer}>
-              <Text style={styles.inventoryValueText}>
-                {formatCurrency(STATIC_INVENTORY_VALUE)}
-              </Text>
-              <Text style={styles.inventoryValueSub}>
-                Costo total estimado en bodega
-              </Text>
-              <Text style={styles.emptyText}>* Dato simulado</Text>
-            </View>
+            {loadingInventoryValue ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : !inventoryValue ? (
+              <Text style={styles.emptyText}>No se pudo cargar el valor del inventario.</Text>
+            ) : (
+              <View style={styles.inventoryValueContainer}>
+                {/* Capital Invertido */}
+                <View style={{alignItems: 'center', marginBottom: 20}}>
+                  <Text style={styles.inventoryValueText}>
+                    {formatCurrency(inventoryValue.total_purchase_value)}
+                  </Text>
+                  <Text style={styles.inventoryValueSub}>
+                    Capital invertido (Precio de Compra)
+                  </Text>
+                </View>
+                
+                {/* Valor Esperado */}
+                <View style={{alignItems: 'center', paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F3F4F6', width: '100%'}}>
+                  <Text style={[styles.inventoryValueText, {color: '#10B981', fontSize: 28}]}>
+                    {formatCurrency(inventoryValue.total_sale_value)}
+                  </Text>
+                  <Text style={styles.inventoryValueSub}>
+                    Valor esperado (Precio de Venta)
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </View>
       </ScrollView>
