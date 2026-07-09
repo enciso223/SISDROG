@@ -17,6 +17,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  Image,
 } from 'react-native';
 import {
   styles,
@@ -25,6 +26,7 @@ import {
   TEAL_LIGHT,
   AMBER,
   INDIGO,
+  INDIGO_LIGHT,
   SUCCESS,
   DANGER,
   TEXT_SECONDARY,
@@ -35,11 +37,13 @@ import {
 import {
   usePurchasesController,
   useBalanceController,
+  useSalesReportsController,
   BALANCE_PERIODS,
 } from '../../controllers';
 import type {BalancePeriod} from '../../controllers';
 import {Purchase} from '../../models';
 import {Input, Icon} from '../components';
+import {PAYMENT_ICON} from '../../assets/paymentIcon';
 
 
 /* ─── Utilidades de fecha ─── */
@@ -615,26 +619,221 @@ const PurchasesTab: React.FC = () => {
 };
 
 /* ══════════════════════════════════════════════════════
-   TAB: Gastos (placeholder)
+   TAB: Ventas (Reportes)
 ══════════════════════════════════════════════════════ */
-const GastosTab: React.FC = () => (
-  <View style={styles.card}>
-    <View style={styles.emptyState}>
-      <Icon name="info" size={40} color="#CBD5E1" />
-      <Text style={styles.emptyTitle}>Próximamente</Text>
-      <Text style={styles.emptySubtitle}>
-        Aquí podrás ver un resumen de gastos agrupado por categoría.
-        Por ahora, gestiona tus gastos desde el módulo de{' '}
-        <Text style={{color: TEAL, fontWeight: '700'}}>Gastos</Text>.
-      </Text>
+const SalesReportsTab: React.FC = () => {
+  const {
+    period,
+    setPeriod,
+    customDateFrom,
+    customDateTo,
+    setCustomDateFrom,
+    setCustomDateTo,
+    summary,
+    loading,
+    error,
+    effectiveDateFrom,
+    effectiveDateTo,
+  } = useSalesReportsController();
+
+  const [fromDisplay, setFromDisplay] = useState(ISOToDisplay(customDateFrom));
+  const [toDisplay, setToDisplay]     = useState(ISOToDisplay(customDateTo));
+
+  const handleApplyCustom = () => {
+    setCustomDateFrom(displayToISO(fromDisplay));
+    setCustomDateTo(displayToISO(toDisplay));
+  };
+
+  const handlePeriodSelect = (p: BalancePeriod) => {
+    setPeriod(p);
+    if (p !== 'custom') {
+      setFromDisplay('');
+      setToDisplay('');
+    }
+  };
+
+  const rangeLabel =
+    effectiveDateFrom && effectiveDateTo
+      ? `${ISOToDisplay(effectiveDateFrom)} – ${ISOToDisplay(effectiveDateTo)}`
+      : effectiveDateFrom
+        ? `Desde ${ISOToDisplay(effectiveDateFrom)}`
+        : '';
+
+  return (
+    <View>
+      {/* Error */}
+      {error && (
+        <View style={styles.errorBanner}>
+          <Icon name="warning" size={16} color={DANGER} />
+          <Text style={styles.errorBannerText}>{error}</Text>
+        </View>
+      )}
+
+      {/* Selector de periodo */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIconBadge}>
+            <Icon name="calendar" size={16} color={TEAL} />
+          </View>
+          <View style={{flex: 1}}>
+            <Text style={styles.cardTitle}>Período de análisis</Text>
+            <Text style={styles.cardSubtitle}>
+              Selecciona el rango de tiempo a consultar
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.chipRow}>
+          {BALANCE_PERIODS.map(bp => (
+            <TouchableOpacity
+              key={bp.key}
+              style={[styles.chip, period === bp.key && styles.chipActive]}
+              onPress={() => handlePeriodSelect(bp.key)}
+              activeOpacity={0.8}>
+              <Text
+                style={[
+                  styles.chipText,
+                  period === bp.key && styles.chipTextActive,
+                ]}>
+                {bp.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Inputs de rango personalizado */}
+        {period === 'custom' && (
+          <>
+            <View style={[styles.formRow, {marginTop: 12}]}>
+              <View style={styles.formColSmall}>
+                <Input
+                  label="Desde"
+                  placeholder="DD/MM/AAAA"
+                  keyboardType="numeric"
+                  value={fromDisplay}
+                  onChangeText={v => setFromDisplay(maskDate(v))}
+                  maxLength={10}
+                />
+              </View>
+              <View style={styles.formColSmall}>
+                <Input
+                  label="Hasta"
+                  placeholder="DD/MM/AAAA"
+                  keyboardType="numeric"
+                  value={toDisplay}
+                  onChangeText={v => setToDisplay(maskDate(v))}
+                  maxLength={10}
+                />
+              </View>
+            </View>
+            <View style={styles.filterActions}>
+              <TouchableOpacity
+                style={styles.primaryButtonInline}
+                onPress={handleApplyCustom}
+                activeOpacity={0.9}>
+                <Icon name="search" size={14} color={BG_SURFACE} />
+                <Text style={styles.primaryButtonText}>Calcular</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {rangeLabel ? (
+          <Text style={[styles.filterInfo, {marginTop: 8}]}>
+            Rango activo: {rangeLabel}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* KPI cards */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIconBadge}>
+            <Icon name="reports" size={16} color={TEAL} />
+          </View>
+          <View style={{flex: 1}}>
+            <Text style={styles.cardTitle}>Reporte de ventas</Text>
+            <Text style={styles.cardSubtitle}>
+              Total de ingresos y estadísticas
+            </Text>
+          </View>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color={TEAL}
+            style={{marginVertical: 32}}
+          />
+        ) : !summary.hasData ? (
+          /* Estado vacío */
+          <View style={styles.emptyState}>
+            <Icon name="info" size={40} color="#CBD5E1" />
+            <Text style={styles.emptyTitle}>Sin ventas para este período</Text>
+            <Text style={styles.emptySubtitle}>
+              No se encontraron ventas registradas en el rango seleccionado.
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* Total ventas */}
+            <View style={[styles.kpiCard, {backgroundColor: TEAL_LIGHT, borderColor: '#CCFBF1'}]}>
+              <View style={styles.kpiLeft}>
+                <View style={[styles.kpiIcon, {backgroundColor: '#99F6E4'}]}>
+                  <Icon name="money" size={20} color={TEAL_DARK} />
+                </View>
+                <View>
+                  <Text style={[styles.kpiLabel, {color: TEAL_DARK}]}>Total Ventas</Text>
+                  <Text style={[styles.kpiHint, {color: '#5EEAD4'}]}>Ingresos netos del periodo</Text>
+                </View>
+              </View>
+              <Text style={[styles.kpiValue, {color: TEAL_DARK}]}>
+                {formatCurrency(summary.totalSales)}
+              </Text>
+            </View>
+
+            {/* Número de transacciones */}
+            <View style={[styles.kpiCard, {backgroundColor: INDIGO_LIGHT, borderColor: '#E0E7FF', marginTop: 12}]}>
+              <View style={styles.kpiLeft}>
+                <View style={[styles.kpiIcon, {backgroundColor: '#C7D2FE'}]}>
+                  <Icon name="cart" size={20} color={INDIGO} />
+                </View>
+                <View>
+                  <Text style={[styles.kpiLabel, {color: INDIGO}]}>Transacciones</Text>
+                  <Text style={[styles.kpiHint, {color: '#818CF8'}]}>Facturas/tickets generados</Text>
+                </View>
+              </View>
+              <Text style={[styles.kpiValue, {color: INDIGO}]}>
+                {summary.transactionCount}
+              </Text>
+            </View>
+
+            {/* Promedio diario */}
+            <View style={[styles.kpiCard, {backgroundColor: '#F3F4F6', borderColor: '#E5E7EB', marginTop: 12}]}>
+              <View style={styles.kpiLeft}>
+                <View style={[styles.kpiIcon, {backgroundColor: '#E5E7EB'}]}>
+                  <Icon name="reports" size={20} color="#4B5563" />
+                </View>
+                <View>
+                  <Text style={[styles.kpiLabel, {color: '#4B5563'}]}>Promedio Diario</Text>
+                  <Text style={[styles.kpiHint, {color: '#9CA3AF'}]}>Venta promedio por día</Text>
+                </View>
+              </View>
+              <Text style={[styles.kpiValue, {color: '#4B5563'}]}>
+                {formatCurrency(summary.averageDaily)}
+              </Text>
+            </View>
+          </>
+        )}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 /* ══════════════════════════════════════════════════════
    Tabs definition
 ══════════════════════════════════════════════════════ */
-type ReportTab = 'balance' | 'compras' | 'gastos';
+type ReportTab = 'balance' | 'compras' | 'ventas';
 
 interface TabConfig {
   key: ReportTab;
@@ -644,8 +843,8 @@ interface TabConfig {
 
 const TABS: TabConfig[] = [
   {key: 'balance', label: 'Balance',  icon: 'reports'},
+  {key: 'ventas',  label: 'Ventas',   icon: 'money'},
   {key: 'compras', label: 'Compras',  icon: 'cart'},
-  {key: 'gastos',  label: 'Gastos',   icon: 'cash'},
 ];
 
 /* ══════════════════════════════════════════════════════
@@ -684,11 +883,23 @@ export const ReportsScreen: React.FC = () => {
                   style={[styles.tabItem, isActive && styles.tabItemActive]}
                   onPress={() => setActiveTab(tab.key)}
                   activeOpacity={0.8}>
-                  <Icon
-                    name={tab.icon}
-                    size={15}
-                    color={isActive ? BG_SURFACE : TEXT_SECONDARY}
-                  />
+                  {tab.key === 'ventas' ? (
+                    <Image
+                      source={{uri: PAYMENT_ICON}}
+                      style={{
+                        width: 16,
+                        height: 16,
+                        tintColor: isActive ? BG_SURFACE : TEXT_SECONDARY,
+                      }}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <Icon
+                      name={tab.icon as any}
+                      size={15}
+                      color={isActive ? BG_SURFACE : TEXT_SECONDARY}
+                    />
+                  )}
                   <Text
                     style={[
                       styles.tabLabel,
@@ -704,11 +915,10 @@ export const ReportsScreen: React.FC = () => {
 
         {/* ── Contenido del tab activo ── */}
         {activeTab === 'balance' && <BalanceTab />}
+        {activeTab === 'ventas'  && <SalesReportsTab />}
         {activeTab === 'compras' && <PurchasesTab />}
-        {activeTab === 'gastos'  && <GastosTab />}
 
       </ScrollView>
     </View>
   );
 };
-
