@@ -5,8 +5,8 @@
  * los gastos por rango de fechas.
  */
 
-import {useState, useCallback, useEffect} from 'react';
-import {expensesService} from '../services';
+import {useState, useCallback, useEffect, useMemo} from 'react';
+import {expensesService, mockExpenses} from '../services';
 import {Expense, ExpenseCreate} from '../models';
 import {DEMO_MODE} from '../config/constants';
 
@@ -22,10 +22,12 @@ export interface UseExpensesControllerReturn {
   createExpense: (data: ExpenseCreate) => Promise<void>;
   clearFilters: () => void;
   clearError: () => void;
+  /** Suma total de los gastos mostrados (filtro activo). */
+  total: number;
 }
 
-// Almacén en memoria para el modo demo (sin backend).
-let demoExpenses: Expense[] = [];
+// Almacén en memoria para el modo demo (sin backend), pre-cargado con datos mock.
+let demoExpenses: Expense[] = DEMO_MODE ? [...mockExpenses] : [];
 
 export const useExpensesController = (): UseExpensesControllerReturn => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -104,6 +106,11 @@ export const useExpensesController = (): UseExpensesControllerReturn => {
 
   const clearError = useCallback(() => setError(null), []);
 
+  const total = useMemo(
+    () => expenses.reduce((sum, e) => sum + (e.amount || 0), 0),
+    [expenses],
+  );
+
   return {
     expenses,
     loading,
@@ -116,5 +123,6 @@ export const useExpensesController = (): UseExpensesControllerReturn => {
     createExpense,
     clearFilters,
     clearError,
+    total,
   };
 };

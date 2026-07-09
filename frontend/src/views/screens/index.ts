@@ -4,3 +4,4 @@ export {SalesScreen} from './SalesScreen';
 export {LoginScreen} from './LoginScreen';
 export {RegisterScreen} from './RegisterScreen';
 export {ExpensesScreen} from './ExpensesScreen';
+export {ReportsScreen} from './ReportsScreen';

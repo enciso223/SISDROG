@@ -5,7 +5,7 @@
  */
 
 import {useState, useCallback} from 'react';
-import {inventoryService, mockProducts, mockAlerts, donationsService} from '../services';
+import {inventoryService, mockProducts, mockAlerts, donationsService, purchasesService} from '../services';
 import {Product, ProductCreate, InventoryAlertsResponse} from '../models';
 import {DEMO_MODE} from '../config/constants';
 
@@ -100,26 +100,39 @@ export const useInventoryController = (): UseInventoryControllerReturn => {
           setProducts(prev => [...prev, newProduct]);
         } else {
           const isDonation = data.origin === 'Donación';
+          const isPurchase = data.origin === 'Compra';
           const originalStock = data.stock;
 
-          // Si es donación, registramos el producto con 0 de stock inicial
-          // para no duplicar el inventario; el lote también debe tener 0 aquí
-          // ya que el stock real lo pondrá la donación recibida.
-          if (isDonation && originalStock > 0) {
+          // Si es donación o compra, registramos el producto con 0 de stock inicial
+          // para no duplicar el inventario; el lote se creará/actualizará mediante
+          // el servicio respectivo (donación o compra).
+          if ((isDonation || isPurchase) && originalStock > 0) {
             data = {...data, stock: 0};
           }
 
           const newProduct = await inventoryService.create(data);
 
-          // Registrar la donación recibida — esto actualiza el stock en BD
-          if (isDonation && originalStock > 0 && newProduct.id) {
-            await donationsService.create({
-              donationType: 'received',
-              items: [{ productId: newProduct.id, quantity: originalStock }],
-              notes: 'Donación recibida al registrar nuevo producto',
-            });
-            // Restauramos el stock localmente para la UI
-            newProduct.stock = originalStock;
+          if (originalStock > 0 && newProduct.id) {
+            if (isDonation) {
+              await donationsService.create({
+                donationType: 'received',
+                items: [{ productId: newProduct.id, quantity: originalStock }],
+                notes: 'Donación recibida al registrar nuevo producto',
+              });
+              newProduct.stock = originalStock;
+            } else if (isPurchase) {
+              // Registrar la compra — esto actualiza el stock y crea el lote en BD
+              await purchasesService.create({
+                productId: newProduct.id,
+                purchaseDate: data.purchaseDate || new Date().toISOString().split('T')[0],
+                quantity: originalStock,
+                unitPrice: data.purchasePrice || 0,
+                lotNumber: data.lotNumber || 'N/A',
+                expiryDate: data.expirationDate || '2099-12-31',
+                notes: 'Compra inicial al registrar nuevo producto',
+              });
+              newProduct.stock = originalStock;
+            }
           }
 
           setProducts(prev => [...prev, newProduct]);
