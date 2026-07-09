@@ -1,15 +1,12 @@
 /**
- * Vista: Reportes — Historial de compras
- * (HU "Consultar historial de compras").
+ * Vista: Reportes — Hub con múltiples secciones.
  *
- * Permite al administrador:
- *   - Consultar el historial de compras (fecha, proveedor, producto y total).
- *   - Ver el detalle de cada compra en un panel emergente.
- *   - Filtrar por rango de fechas y/o por proveedor.
- *   - Mostrar un mensaje informativo cuando no hay resultados.
+ * Tabs disponibles:
+ *   - Balance    → Balance financiero (HU "Calcular y visualizar balance financiero")
+ *   - Compras    → Historial de compras (HU "Consultar historial de compras")
+ *   - Gastos     → Placeholder para futuras funcionalidades
  *
- * La compra se origina en el inventario al registrar un producto; aquí
- * únicamente se consulta el historial resultante.
+ * Se puede extender añadiendo más tabs sin modificar la estructura base.
  */
 
 import React, {useState} from 'react';
@@ -20,33 +17,36 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
-  Dimensions,
 } from 'react-native';
-import {usePurchasesController} from '../../controllers';
+import {
+  styles,
+  TEAL,
+  TEAL_DARK,
+  TEAL_LIGHT,
+  AMBER,
+  INDIGO,
+  SUCCESS,
+  DANGER,
+  TEXT_SECONDARY,
+  TEXT_MUTED,
+  BG_SURFACE,
+  BG_SECTION,
+} from './ReportsScreen.styles';
+import {
+  usePurchasesController,
+  useBalanceController,
+  BALANCE_PERIODS,
+} from '../../controllers';
+import type {BalancePeriod} from '../../controllers';
 import {Purchase} from '../../models';
 import {Input, Icon} from '../components';
 
-/* ─── Paleta (coherente con el resto de pantallas) ─── */
-const TEAL = '#0D9488';
-const TEAL_DARK = '#0F766E';
-const TEAL_LIGHT = '#F0FDFA';
-const TEXT_MAIN = '#1E293B';
-const TEXT_SECONDARY = '#475569';
-const TEXT_MUTED = '#94A3B8';
-const BORDER = '#E2E8F0';
-const BG_SURFACE = '#FFFFFF';
-const BG_SECTION = '#F8FAFC';
-const DANGER = '#EF4444';
 
-/* ─── Utilidades de fecha (DD/MM/AAAA visual ↔ YYYY-MM-DD interno) ─── */
+/* ─── Utilidades de fecha ─── */
 const maskDate = (raw: string): string => {
   const digits = raw.replace(/\D/g, '').slice(0, 8);
-  if (digits.length <= 2) {
-    return digits;
-  }
-  if (digits.length <= 4) {
-    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  }
+  if (digits.length <= 2) {return digits;}
+  if (digits.length <= 4) {return `${digits.slice(0, 2)}/${digits.slice(2)}`;}
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 };
 
@@ -59,27 +59,261 @@ const displayToISO = (display: string): string => {
 };
 
 const ISOToDisplay = (iso?: string): string => {
-  if (!iso) {
-    return '';
-  }
+  if (!iso) {return '';}
   const parts = iso.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  }
+  if (parts.length === 3) {return `${parts[2]}/${parts[1]}/${parts[0]}`;}
   return iso;
 };
 
-const formatCurrency = (amount: number | undefined) => {
-  if (amount == null) {
-    return '$0';
-  }
-  const intPart = Math.floor(amount)
+const formatCurrency = (amount: number | undefined): string => {
+  if (amount == null) {return '$0';}
+  const intPart = Math.floor(Math.abs(amount))
     .toString()
     .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return `$${intPart}`;
+  return `${amount < 0 ? '-' : ''}$${intPart}`;
 };
 
-/* ─── Modal de detalle de compra ─── */
+/* ══════════════════════════════════════════════════════
+   TAB: Balance Financiero
+══════════════════════════════════════════════════════ */
+
+const BalanceTab: React.FC = () => {
+  const {
+    period,
+    setPeriod,
+    customDateFrom,
+    customDateTo,
+    setCustomDateFrom,
+    setCustomDateTo,
+    summary,
+    loading,
+    error,
+    effectiveDateFrom,
+    effectiveDateTo,
+  } = useBalanceController();
+
+  // Estados locales para los inputs de fecha custom (formato visual DD/MM/AAAA)
+  const [fromDisplay, setFromDisplay] = useState(ISOToDisplay(customDateFrom));
+  const [toDisplay, setToDisplay]     = useState(ISOToDisplay(customDateTo));
+
+  const handleApplyCustom = () => {
+    setCustomDateFrom(displayToISO(fromDisplay));
+    setCustomDateTo(displayToISO(toDisplay));
+  };
+
+  const handlePeriodSelect = (p: BalancePeriod) => {
+    setPeriod(p);
+    if (p !== 'custom') {
+      setFromDisplay('');
+      setToDisplay('');
+    }
+  };
+
+  const isGain    = summary.balance >= 0;
+  const balanceColor = summary.hasData ? (isGain ? SUCCESS : DANGER) : TEXT_MUTED;
+
+  // Escala de barras: máximo entre todos los valores
+  const maxValue = Math.max(
+    summary.totalSales,
+    summary.totalPurchases,
+    summary.totalExpenses,
+    Math.abs(summary.balance),
+    1,
+  );
+  const pct = (v: number) => `${Math.max((Math.abs(v) / maxValue) * 100, v > 0 ? 1 : 0)}%`;
+
+  const rangeLabel =
+    effectiveDateFrom && effectiveDateTo
+      ? `${ISOToDisplay(effectiveDateFrom)} – ${ISOToDisplay(effectiveDateTo)}`
+      : effectiveDateFrom
+        ? `Desde ${ISOToDisplay(effectiveDateFrom)}`
+        : '';
+
+  return (
+    <View>
+      {/* Error */}
+      {error && (
+        <View style={styles.errorBanner}>
+          <Icon name="warning" size={16} color={DANGER} />
+          <Text style={styles.errorBannerText}>{error}</Text>
+        </View>
+      )}
+
+      {/* Selector de periodo */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIconBadge}>
+            <Icon name="calendar" size={16} color={TEAL} />
+          </View>
+          <View style={{flex: 1}}>
+            <Text style={styles.cardTitle}>Período de análisis</Text>
+            <Text style={styles.cardSubtitle}>
+              Selecciona el rango de tiempo a consultar
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.chipRow}>
+          {BALANCE_PERIODS.map(bp => (
+            <TouchableOpacity
+              key={bp.key}
+              style={[styles.chip, period === bp.key && styles.chipActive]}
+              onPress={() => handlePeriodSelect(bp.key)}
+              activeOpacity={0.8}>
+              <Text
+                style={[
+                  styles.chipText,
+                  period === bp.key && styles.chipTextActive,
+                ]}>
+                {bp.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Inputs de rango personalizado */}
+        {period === 'custom' && (
+          <>
+            <View style={[styles.formRow, {marginTop: 12}]}>
+              <View style={styles.formColSmall}>
+                <Input
+                  label="Desde"
+                  placeholder="DD/MM/AAAA"
+                  keyboardType="numeric"
+                  value={fromDisplay}
+                  onChangeText={v => setFromDisplay(maskDate(v))}
+                  maxLength={10}
+                />
+              </View>
+              <View style={styles.formColSmall}>
+                <Input
+                  label="Hasta"
+                  placeholder="DD/MM/AAAA"
+                  keyboardType="numeric"
+                  value={toDisplay}
+                  onChangeText={v => setToDisplay(maskDate(v))}
+                  maxLength={10}
+                />
+              </View>
+            </View>
+            <View style={styles.filterActions}>
+              <TouchableOpacity
+                style={styles.primaryButtonInline}
+                onPress={handleApplyCustom}
+                activeOpacity={0.9}>
+                <Icon name="search" size={14} color={BG_SURFACE} />
+                <Text style={styles.primaryButtonText}>Calcular</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {rangeLabel ? (
+          <Text style={[styles.filterInfo, {marginTop: 8}]}>
+            Rango activo: {rangeLabel}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* KPI cards */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIconBadge}>
+            <Icon name="reports" size={16} color={TEAL} />
+          </View>
+          <View style={{flex: 1}}>
+            <Text style={styles.cardTitle}>Balance financiero</Text>
+            <Text style={styles.cardSubtitle}>
+              Resumen de ingresos, egresos y resultado
+            </Text>
+          </View>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color={TEAL}
+            style={{marginVertical: 32}}
+          />
+        ) : !summary.hasData ? (
+          /* Estado vacío */
+          <View style={styles.emptyState}>
+            <Icon name="info" size={40} color="#CBD5E1" />
+            <Text style={styles.emptyTitle}>Sin datos para este período</Text>
+            <Text style={styles.emptySubtitle}>
+              No se encontraron ventas ni gastos registrados en el rango
+              seleccionado. Prueba con otro período o registra transacciones.
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* ─── INGRESOS ─── */}
+            <View style={styles.chartSection}>
+              <Text style={styles.chartSectionLabel}>INGRESOS</Text>
+              <View style={styles.barRow}>
+                <Text style={styles.barLabel}>Ventas</Text>
+                <View style={styles.barTrack}>
+                  <View style={[styles.barFill, {width: pct(summary.totalSales), backgroundColor: TEAL}]} />
+                </View>
+                <Text style={[styles.barValue, {color: TEAL_DARK}]}>
+                  {formatCurrency(summary.totalSales)}
+                </Text>
+              </View>
+            </View>
+
+            {/* ─── EGRESOS ─── */}
+            <View style={styles.chartSection}>
+              <Text style={styles.chartSectionLabel}>EGRESOS</Text>
+              <View style={styles.barRow}>
+                <Text style={styles.barLabel}>Compras</Text>
+                <View style={styles.barTrack}>
+                  <View style={[styles.barFill, {width: pct(summary.totalPurchases), backgroundColor: INDIGO}]} />
+                </View>
+                <Text style={[styles.barValue, {color: INDIGO}]}>
+                  {formatCurrency(summary.totalPurchases)}
+                </Text>
+              </View>
+              <View style={styles.barRow}>
+                <Text style={styles.barLabel}>Gastos oper.</Text>
+                <View style={styles.barTrack}>
+                  <View style={[styles.barFill, {width: pct(summary.totalExpenses), backgroundColor: AMBER}]} />
+                </View>
+                <Text style={[styles.barValue, {color: AMBER}]}>
+                  {formatCurrency(summary.totalExpenses)}
+                </Text>
+              </View>
+            </View>
+
+            {/* ─── Divisor ─── */}
+            <View style={styles.chartDivider} />
+
+            {/* ─── RESULTADO ─── */}
+            <View style={styles.resultRow}>
+              <Text style={styles.resultLabel}>
+                {isGain ? ' Ganancia' : ' Pérdida'}
+              </Text>
+              <View style={styles.resultBarTrack}>
+                <View
+                  style={[
+                    styles.resultBarFill,
+                    {width: pct(summary.balance), backgroundColor: balanceColor},
+                  ]}
+                />
+              </View>
+              <Text style={[styles.resultValue, {color: balanceColor}]}>
+                {formatCurrency(summary.balance)}
+              </Text>
+            </View>
+          </>
+        )}
+      </View>
+    </View>
+  );
+};
+
+/* ══════════════════════════════════════════════════════
+   Modal de detalle de compra
+══════════════════════════════════════════════════════ */
 interface PurchaseDetailModalProps {
   purchase: Purchase | null;
   onClose: () => void;
@@ -89,9 +323,7 @@ const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   purchase,
   onClose,
 }) => {
-  if (!purchase) {
-    return null;
-  }
+  if (!purchase) {return null;}
 
   const rows: Array<{label: string; value: string}> = [
     {label: 'Fecha', value: ISOToDisplay(purchase.purchaseDate)},
@@ -113,7 +345,6 @@ const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
     <View style={[StyleSheet.absoluteFill, {zIndex: 1000, elevation: 1000}]}>
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
-          {/* Encabezado */}
           <View style={styles.modalHeader}>
             <View style={styles.cardIconBadge}>
               <Icon name="cart" size={16} color={TEAL} />
@@ -147,7 +378,6 @@ const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
               </View>
             ) : null}
 
-            {/* Total destacado */}
             <View style={styles.totalRow}>
               <Text style={styles.totalRowLabel}>Total</Text>
               <Text style={styles.totalRowValue}>
@@ -168,8 +398,10 @@ const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   );
 };
 
-/* ─── Pantalla principal ─── */
-export const ReportsScreen: React.FC = () => {
+/* ══════════════════════════════════════════════════════
+   TAB: Historial de Compras
+══════════════════════════════════════════════════════ */
+const PurchasesTab: React.FC = () => {
   const {
     purchases,
     loading,
@@ -185,12 +417,9 @@ export const ReportsScreen: React.FC = () => {
     clearFilters,
   } = usePurchasesController();
 
-  // Estado local de los inputs de fecha (texto DD/MM/AAAA)
   const [fromDisplay, setFromDisplay] = useState(ISOToDisplay(dateFrom));
-  const [toDisplay, setToDisplay] = useState(ISOToDisplay(dateTo));
-
-  // Compra seleccionada para el modal de detalle
-  const [selected, setSelected] = useState<Purchase | null>(null);
+  const [toDisplay, setToDisplay]     = useState(ISOToDisplay(dateTo));
+  const [selected, setSelected]       = useState<Purchase | null>(null);
 
   const applyFilters = () => {
     setDateFrom(displayToISO(fromDisplay));
@@ -206,205 +435,175 @@ export const ReportsScreen: React.FC = () => {
   const hasActiveFilter = !!dateFrom || !!dateTo || !!supplierName;
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-        {/* ── Banner de error ── */}
-        {error && (
-          <View style={styles.errorBanner}>
-            <Icon name="warning" size={16} color={DANGER} />
-            <Text style={styles.errorBannerText}>{error}</Text>
-          </View>
-        )}
+    <View>
+      {/* Error */}
+      {error && (
+        <View style={styles.errorBanner}>
+          <Icon name="warning" size={16} color={DANGER} />
+          <Text style={styles.errorBannerText}>{error}</Text>
+        </View>
+      )}
 
-        {/* ── Encabezado ── */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardIconBadge}>
-              <Icon name="history" size={16} color={TEAL} />
-            </View>
-            <View style={{flex: 1}}>
-              <Text style={styles.cardTitle}>Historial de compras</Text>
-              <Text style={styles.cardSubtitle}>
-                Consulta tus adquisiciones y analiza el gasto en productos
-              </Text>
-            </View>
+      {/* Filtros */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIconBadge}>
+            <Icon name="filter" size={16} color={TEAL} />
+          </View>
+          <View style={{flex: 1}}>
+            <Text style={styles.cardTitle}>Filtrar compras</Text>
+            <Text style={styles.cardSubtitle}>
+              Por rango de fechas y/o proveedor
+            </Text>
           </View>
         </View>
 
-        {/* ── Filtros ── */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardIconBadge}>
-              <Icon name="filter" size={16} color={TEAL} />
-            </View>
-            <View style={{flex: 1}}>
-              <Text style={styles.cardTitle}>Filtrar</Text>
-              <Text style={styles.cardSubtitle}>
-                Por rango de fechas y/o por proveedor
-              </Text>
-            </View>
+        <View style={styles.formRow}>
+          <View style={styles.formColSmall}>
+            <Input
+              label="Desde"
+              placeholder="DD/MM/AAAA"
+              keyboardType="numeric"
+              value={fromDisplay}
+              onChangeText={v => setFromDisplay(maskDate(v))}
+              maxLength={10}
+            />
           </View>
-
-          <View style={styles.formRow}>
-            <View style={styles.formColSmall}>
-              <Input
-                label="Desde"
-                placeholder="DD/MM/AAAA"
-                keyboardType="numeric"
-                value={fromDisplay}
-                onChangeText={v => setFromDisplay(maskDate(v))}
-                maxLength={10}
-              />
-            </View>
-            <View style={styles.formColSmall}>
-              <Input
-                label="Hasta"
-                placeholder="DD/MM/AAAA"
-                keyboardType="numeric"
-                value={toDisplay}
-                onChangeText={v => setToDisplay(maskDate(v))}
-                maxLength={10}
-              />
-            </View>
+          <View style={styles.formColSmall}>
+            <Input
+              label="Hasta"
+              placeholder="DD/MM/AAAA"
+              keyboardType="numeric"
+              value={toDisplay}
+              onChangeText={v => setToDisplay(maskDate(v))}
+              maxLength={10}
+            />
           </View>
+        </View>
 
-          {/* Proveedor: chips seleccionables */}
-          <Text style={styles.fieldLabel}>Proveedor</Text>
-          <View style={styles.chipRow}>
-            <TouchableOpacity
+        <Text style={styles.fieldLabel}>Proveedor</Text>
+        <View style={styles.chipRow}>
+          <TouchableOpacity
+            style={[styles.chip, supplierName === '' && styles.chipActive]}
+            onPress={() => setSupplierName('')}
+            activeOpacity={0.8}>
+            <Text
               style={[
-                styles.chip,
-                supplierName === '' && styles.chipActive,
-              ]}
-              onPress={() => setSupplierName('')}
+                styles.chipText,
+                supplierName === '' && styles.chipTextActive,
+              ]}>
+              Todos
+            </Text>
+          </TouchableOpacity>
+          {suppliers.map(sup => (
+            <TouchableOpacity
+              key={sup}
+              style={[styles.chip, supplierName === sup && styles.chipActive]}
+              onPress={() => setSupplierName(sup)}
               activeOpacity={0.8}>
               <Text
                 style={[
                   styles.chipText,
-                  supplierName === '' && styles.chipTextActive,
+                  supplierName === sup && styles.chipTextActive,
                 ]}>
-                Todos
+                {sup}
               </Text>
             </TouchableOpacity>
-            {suppliers.map(sup => (
-              <TouchableOpacity
-                key={sup}
-                style={[
-                  styles.chip,
-                  supplierName === sup && styles.chipActive,
-                ]}
-                onPress={() => setSupplierName(sup)}
-                activeOpacity={0.8}>
-                <Text
-                  style={[
-                    styles.chipText,
-                    supplierName === sup && styles.chipTextActive,
-                  ]}>
-                  {sup}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          ))}
+        </View>
 
-          <View style={styles.filterActions}>
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleClearFilters}
-              activeOpacity={0.8}>
-              <Text style={styles.secondaryButtonText}>Limpiar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.primaryButtonInline}
-              onPress={applyFilters}
-              activeOpacity={0.9}>
-              <Icon name="search" size={14} color={BG_SURFACE} />
-              <Text style={styles.primaryButtonText}>Aplicar</Text>
-            </TouchableOpacity>
+        <View style={styles.filterActions}>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={handleClearFilters}
+            activeOpacity={0.8}>
+            <Text style={styles.secondaryButtonText}>Limpiar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.primaryButtonInline}
+            onPress={applyFilters}
+            activeOpacity={0.9}>
+            <Icon name="search" size={14} color={BG_SURFACE} />
+            <Text style={styles.primaryButtonText}>Aplicar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Lista */}
+      <View style={styles.card}>
+        <View style={styles.listHeader}>
+          <Text style={styles.cardTitle}>Compras registradas</Text>
+          <View style={styles.totalPill}>
+            <Text style={styles.totalPillLabel}>Total</Text>
+            <Text style={styles.totalPillValue}>{formatCurrency(total)}</Text>
           </View>
         </View>
 
-        {/* ── Lista de compras ── */}
-        <View style={styles.card}>
-          <View style={styles.listHeader}>
-            <Text style={styles.cardTitle}>Compras registradas</Text>
-            <View style={styles.totalPill}>
-              <Text style={styles.totalPillLabel}>Total</Text>
-              <Text style={styles.totalPillValue}>{formatCurrency(total)}</Text>
-            </View>
-          </View>
+        {hasActiveFilter && (
+          <Text style={styles.filterInfo}>
+            Filtro:{' '}
+            {dateFrom ? `desde ${ISOToDisplay(dateFrom)} ` : ''}
+            {dateTo ? `hasta ${ISOToDisplay(dateTo)} ` : ''}
+            {supplierName ? `· ${supplierName}` : ''}
+          </Text>
+        )}
 
-          {hasActiveFilter && (
-            <Text style={styles.filterInfo}>
-              Filtro:{' '}
-              {dateFrom ? `desde ${ISOToDisplay(dateFrom)} ` : ''}
-              {dateTo ? `hasta ${ISOToDisplay(dateTo)} ` : ''}
-              {supplierName ? `· ${supplierName}` : ''}
+        {/* Encabezado de tabla */}
+        <View style={styles.tableHeader}>
+          <Text style={[styles.thText, {flex: 2}]}>FECHA</Text>
+          <Text style={[styles.thText, {flex: 3}]}>PROVEEDOR</Text>
+          <Text style={[styles.thText, {flex: 3}]}>PRODUCTO</Text>
+          <Text style={[styles.thText, {flex: 2, textAlign: 'right'}]}>
+            TOTAL
+          </Text>
+          <Text style={[styles.thText, {flex: 1, textAlign: 'right'}]}> </Text>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color={TEAL}
+            style={{marginVertical: 32}}
+          />
+        ) : purchases.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Icon name="info" size={40} color="#CBD5E1" />
+            <Text style={styles.emptyTitle}>No hay compras para mostrar</Text>
+            <Text style={styles.emptySubtitle}>
+              {hasActiveFilter
+                ? 'No se encontraron compras con los filtros seleccionados.'
+                : 'Las compras aparecerán aquí a medida que registres productos en el inventario.'}
             </Text>
-          )}
-
-          {/* Encabezado de tabla */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.thText, {flex: 2}]}>FECHA</Text>
-            <Text style={[styles.thText, {flex: 3}]}>PROVEEDOR</Text>
-            <Text style={[styles.thText, {flex: 3}]}>PRODUCTO</Text>
-            <Text style={[styles.thText, {flex: 2, textAlign: 'right'}]}>
-              TOTAL
-            </Text>
-            <Text style={[styles.thText, {flex: 1, textAlign: 'right'}]}> </Text>
           </View>
-
-          {loading ? (
-            <ActivityIndicator
-              size="large"
-              color={TEAL}
-              style={{marginVertical: 32}}
-            />
-          ) : purchases.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Icon name="info" size={40} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No hay compras para mostrar</Text>
-              <Text style={styles.emptySubtitle}>
-                {hasActiveFilter
-                  ? 'No se encontraron compras con los filtros seleccionados.'
-                  : 'Las compras aparecerán aquí a medida que registres productos en el inventario.'}
+        ) : (
+          purchases.map(purchase => (
+            <View
+              key={purchase.id ?? `${purchase.productId}-${purchase.purchaseDate}`}
+              style={styles.tableRow}>
+              <Text style={[styles.tdDate, {flex: 2}]}>
+                {ISOToDisplay(purchase.purchaseDate)}
               </Text>
-            </View>
-          ) : (
-            purchases.map(purchase => (
-              <View
-                key={purchase.id ?? `${purchase.productId}-${purchase.purchaseDate}`}
-                style={styles.tableRow}>
-                <Text style={[styles.tdDate, {flex: 2}]}>
-                  {ISOToDisplay(purchase.purchaseDate)}
-                </Text>
-                <Text
-                  style={[styles.tdText, {flex: 3}]}
-                  numberOfLines={2}>
-                  {purchase.supplierName || 'Sin proveedor'}
-                </Text>
-                <Text
-                  style={[styles.tdText, {flex: 3}]}
-                  numberOfLines={2}>
-                  {purchase.productName || `Producto #${purchase.productId}`}
-                </Text>
-                <Text style={[styles.tdAmount, {flex: 2}]}>
-                  {formatCurrency(purchase.totalAmount)}
-                </Text>
-                <View style={{flex: 1, alignItems: 'flex-end'}}>
-                  <TouchableOpacity
-                    style={styles.detailButton}
-                    onPress={() => setSelected(purchase)}
-                    activeOpacity={0.8}>
-                    <Icon name="search" size={14} color={TEAL_DARK} />
-                  </TouchableOpacity>
-                </View>
+              <Text style={[styles.tdText, {flex: 3}]} numberOfLines={2}>
+                {purchase.supplierName || 'Sin proveedor'}
+              </Text>
+              <Text style={[styles.tdText, {flex: 3}]} numberOfLines={2}>
+                {purchase.productName || `Producto #${purchase.productId}`}
+              </Text>
+              <Text style={[styles.tdAmount, {flex: 2}]}>
+                {formatCurrency(purchase.totalAmount)}
+              </Text>
+              <View style={{flex: 1, alignItems: 'flex-end'}}>
+                <TouchableOpacity
+                  style={styles.detailButton}
+                  onPress={() => setSelected(purchase)}
+                  activeOpacity={0.8}>
+                  <Icon name="search" size={14} color={TEAL_DARK} />
+                </TouchableOpacity>
               </View>
-            ))
-          )}
-        </View>
-      </ScrollView>
+            </View>
+          ))
+        )}
+      </View>
 
       {/* Modal de detalle */}
       <PurchaseDetailModal
@@ -415,341 +614,101 @@ export const ReportsScreen: React.FC = () => {
   );
 };
 
-/* ─── Estilos ─── */
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BG_SECTION,
-  },
-  scrollContent: {
-    padding: 24,
-    paddingBottom: 48,
-  },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginBottom: 16,
-  },
-  errorBannerText: {
-    color: DANGER,
-    fontSize: 13,
-    fontWeight: '500',
-    flex: 1,
-  },
-  card: {
-    backgroundColor: BG_SURFACE,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: 20,
-    marginBottom: 20,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  cardIconBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: TEAL_LIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#CCFBF1',
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: TEXT_MAIN,
-  },
-  cardSubtitle: {
-    fontSize: 12,
-    color: TEXT_MUTED,
-    marginTop: 2,
-  },
-  formRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  formColSmall: {
-    flex: 1,
-  },
-  fieldLabel: {
-    marginTop: 6,
-    marginBottom: 8,
-    fontSize: 13,
-    fontWeight: '600',
-    color: TEXT_SECONDARY,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  chip: {
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: BG_SURFACE,
-  },
-  chipActive: {
-    backgroundColor: TEAL_LIGHT,
-    borderColor: '#CCFBF1',
-  },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: TEXT_SECONDARY,
-  },
-  chipTextActive: {
-    color: TEAL_DARK,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: TEAL,
-    borderRadius: 10,
-    paddingVertical: 13,
-    marginTop: 12,
-  },
-  primaryButtonInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: TEAL,
-    borderRadius: 10,
-    paddingVertical: 11,
-    paddingHorizontal: 22,
-  },
-  primaryButtonText: {
-    color: BG_SURFACE,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  filterActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 8,
-  },
-  secondaryButton: {
-    paddingVertical: 11,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: BG_SURFACE,
-  },
-  secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: TEXT_SECONDARY,
-  },
-  listHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  totalPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: TEAL_LIGHT,
-    borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: '#CCFBF1',
-  },
-  totalPillLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: TEAL_DARK,
-  },
-  totalPillValue: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: TEAL_DARK,
-  },
-  filterInfo: {
-    fontSize: 12,
-    color: TEXT_MUTED,
-    marginBottom: 8,
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    paddingBottom: 10,
-    paddingTop: 6,
-    marginBottom: 4,
-  },
-  thText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: TEXT_MUTED,
-    letterSpacing: 0.5,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  tdDate: {
-    fontSize: 13,
-    color: TEXT_SECONDARY,
-    fontWeight: '500',
-  },
-  tdText: {
-    fontSize: 13,
-    color: TEXT_MAIN,
-    paddingRight: 8,
-  },
-  tdAmount: {
-    fontSize: 13,
-    color: TEXT_MAIN,
-    fontWeight: '700',
-    textAlign: 'right',
-  },
-  detailButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: TEAL_LIGHT,
-    borderWidth: 1,
-    borderColor: '#CCFBF1',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: TEXT_SECONDARY,
-    marginTop: 8,
-  },
-  emptySubtitle: {
-    fontSize: 13,
-    color: TEXT_MUTED,
-    textAlign: 'center',
-    maxWidth: 360,
-  },
-  /* ─── Modal ─── */
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    width: 440,
-    maxWidth: '92%',
-    maxHeight: Math.round(Dimensions.get('window').height * 0.85),
-    backgroundColor: BG_SURFACE,
-    borderRadius: 14,
-    padding: 20,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 10},
-    shadowOpacity: 0.15,
-    shadowRadius: 15,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  modalCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: BG_SECTION,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  detailLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: TEXT_MUTED,
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: TEXT_MAIN,
-    flex: 1,
-    textAlign: 'right',
-    marginLeft: 16,
-  },
-  notesBox: {
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: BG_SECTION,
-    borderWidth: 1,
-    borderColor: BORDER,
-    gap: 6,
-  },
-  notesText: {
-    fontSize: 13,
-    color: TEXT_SECONDARY,
-    lineHeight: 18,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: TEAL_LIGHT,
-    borderWidth: 1,
-    borderColor: '#CCFBF1',
-  },
-  totalRowLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: TEAL_DARK,
-  },
-  totalRowValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: TEAL_DARK,
-  },
-});
+/* ══════════════════════════════════════════════════════
+   TAB: Gastos (placeholder)
+══════════════════════════════════════════════════════ */
+const GastosTab: React.FC = () => (
+  <View style={styles.card}>
+    <View style={styles.emptyState}>
+      <Icon name="info" size={40} color="#CBD5E1" />
+      <Text style={styles.emptyTitle}>Próximamente</Text>
+      <Text style={styles.emptySubtitle}>
+        Aquí podrás ver un resumen de gastos agrupado por categoría.
+        Por ahora, gestiona tus gastos desde el módulo de{' '}
+        <Text style={{color: TEAL, fontWeight: '700'}}>Gastos</Text>.
+      </Text>
+    </View>
+  </View>
+);
+
+/* ══════════════════════════════════════════════════════
+   Tabs definition
+══════════════════════════════════════════════════════ */
+type ReportTab = 'balance' | 'compras' | 'gastos';
+
+interface TabConfig {
+  key: ReportTab;
+  label: string;
+  icon: string;
+}
+
+const TABS: TabConfig[] = [
+  {key: 'balance', label: 'Balance',  icon: 'reports'},
+  {key: 'compras', label: 'Compras',  icon: 'cart'},
+  {key: 'gastos',  label: 'Gastos',   icon: 'cash'},
+];
+
+/* ══════════════════════════════════════════════════════
+   Pantalla principal — ReportsScreen
+══════════════════════════════════════════════════════ */
+export const ReportsScreen: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<ReportTab>('balance');
+
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+
+        {/* ── Encabezado de sección ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIconBadge}>
+              <Icon name="reports" size={16} color={TEAL} />
+            </View>
+            <View style={{flex: 1}}>
+              <Text style={styles.cardTitle}>Reportes</Text>
+              <Text style={styles.cardSubtitle}>
+                Analiza el desempeño financiero y el historial de operaciones
+              </Text>
+            </View>
+          </View>
+
+          {/* ── Tabs ── */}
+          <View style={styles.tabBar}>
+            {TABS.map(tab => {
+              const isActive = activeTab === tab.key;
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  style={[styles.tabItem, isActive && styles.tabItemActive]}
+                  onPress={() => setActiveTab(tab.key)}
+                  activeOpacity={0.8}>
+                  <Icon
+                    name={tab.icon}
+                    size={15}
+                    color={isActive ? BG_SURFACE : TEXT_SECONDARY}
+                  />
+                  <Text
+                    style={[
+                      styles.tabLabel,
+                      isActive && styles.tabLabelActive,
+                    ]}>
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* ── Contenido del tab activo ── */}
+        {activeTab === 'balance' && <BalanceTab />}
+        {activeTab === 'compras' && <PurchasesTab />}
+        {activeTab === 'gastos'  && <GastosTab />}
+
+      </ScrollView>
+    </View>
+  );
+};
+
