@@ -36,10 +36,8 @@ const MENU_ITEMS: MenuItem[] = [
   {key: 'home', label: 'Inicio', icon: 'home'},
   {key: 'sales', label: 'Ventas (POS)', icon: 'sales'},
   {key: 'inventory', label: 'Inventario', icon: 'inventory'},
-  {key: 'purchases', label: 'Compras', icon: 'purchases'},
   {key: 'expenses', label: 'Gastos', icon: 'expenses'},
   {key: 'reports', label: 'Reportes', icon: 'reports'},
-  {key: 'settings', label: 'Configuración', icon: 'settings'},
 ];
 
 // ─── Toggle Button ────────────────────────────────────────────────
@@ -158,16 +156,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isExpanded ? (
           <View style={styles.brandLogoRow}>
             <View style={styles.brandIcon}>
-              <Text style={styles.brandIconText}>F</Text>
+              <Text style={styles.brandIconText}>D</Text>
             </View>
             <View>
-              <Text style={styles.brandTitle}>FarmaTech</Text>
+              <Text style={styles.brandTitle}>Droguería Laureano Gómez</Text>
               <Text style={styles.brandSubtitle}>{branchName}</Text>
             </View>
           </View>
         ) : (
           <View style={[styles.brandIcon, styles.brandIconCollapsed]}>
-            <Text style={styles.brandIconText}>F</Text>
+            <Text style={styles.brandIconText}>D</Text>
           </View>
         )}
       </View>

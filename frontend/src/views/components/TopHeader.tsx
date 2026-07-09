@@ -47,24 +47,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         {breadcrumb && <Text style={styles.breadcrumb}>{breadcrumb}</Text>}
       </View>
 
-      {/* Buscador global */}
-      <View style={styles.searchWrapper}>
-        <Icon name="search" size={15} color="#9CA3AF" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder={placeholder}
-          placeholderTextColor="#9CA3AF"
-          value={searchValue}
-          onChangeText={onSearchChange}
-        />
-      </View>
+
 
       {/* Área de perfil */}
       <View style={styles.profileArea}>
-        {/* Botón de notificaciones */}
-        <TouchableOpacity style={styles.notificationBtn} activeOpacity={0.7}>
-          <Icon name="reports" size={16} color="#6B7280" />
-        </TouchableOpacity>
 
         {/* Info del usuario */}
         <View style={styles.userInfo}>

@@ -1,5 +1,5 @@
 /**
- * Vista: Pantalla principal (dashboard).
+ * Vista: Pantalla principal (dashboard) — diseño premium.
  */
 
 import React, {useEffect, useState} from 'react';
@@ -10,19 +10,21 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import {Button, ReceiptModal} from '../components';
+import {ReceiptModal, Icon} from '../components';
 import type {AppScreen} from '../components/Sidebar';
 import {salesService} from '../../services/SalesService';
 import {reportsService, TopProductItem, InventoryValueResponse} from '../../services/ReportsService';
 import {Sale} from '../../models';
-import {homeStyles as styles} from './HomeScreen.styles';
+import {homeStyles as styles, TEAL, TEAL_DARK, INDIGO, AMBER} from './HomeScreen.styles';
 
 interface HomeScreenProps {
   onNavigate: (screen: AppScreen) => void;
 }
 
 const formatCurrency = (amount: number) => {
-  const intPart = Math.floor(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const intPart = Math.floor(Math.abs(amount))
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return `$${intPart}`;
 };
 
@@ -37,20 +39,27 @@ const formatDate = (isoString: string) => {
   });
 };
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate}) => {
+const getTodayLabel = () => {
+  const d = new Date();
+  return d.toLocaleDateString('es-CO', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+};
+
+export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate: _onNavigate}) => {  // eslint-disable-line @typescript-eslint/no-unused-vars
   const [sales, setSales] = useState<Sale[]>([]);
   const [loadingSales, setLoadingSales] = useState(true);
 
-  // Ranking de productos
   const [topProducts, setTopProducts] = useState<TopProductItem[]>([]);
   const [loadingTopProducts, setLoadingTopProducts] = useState(true);
   const [rankingPeriod, setRankingPeriod] = useState<number | 'all'>(30);
 
-  // Valor de inventario
   const [inventoryValue, setInventoryValue] = useState<InventoryValueResponse | null>(null);
   const [loadingInventoryValue, setLoadingInventoryValue] = useState(true);
 
-  // Estado para el modal de recibo
   const [isReceiptVisible, setIsReceiptVisible] = useState(false);
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
 
@@ -67,20 +76,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate}) => {
     try {
       setLoadingSales(true);
       const data = await salesService.getAll();
-      
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
       const filteredAndSorted = data
-        .filter(sale => new Date(sale.createdAt ?? 0).getTime() >= thirtyDaysAgo.getTime())
+        .filter(s => new Date(s.createdAt ?? 0).getTime() >= thirtyDaysAgo.getTime())
         .sort(
           (a, b) =>
             new Date(b.createdAt ?? 0).getTime() -
             new Date(a.createdAt ?? 0).getTime(),
         );
       setSales(filteredAndSorted);
-    } catch (error) {
-      console.error('Error fetching sales:', error);
+    } catch (e) {
+      console.error('Error fetching sales:', e);
     } finally {
       setLoadingSales(false);
     }
@@ -90,17 +97,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate}) => {
     try {
       setLoadingTopProducts(true);
       const filters: any = {};
-      
       if (period !== 'all') {
         const fromDate = new Date();
         fromDate.setDate(fromDate.getDate() - period);
         filters.dateFrom = fromDate.toISOString().split('T')[0];
       }
-
       const response = await reportsService.getTopProducts(filters, 5);
       setTopProducts(response.products || []);
-    } catch (error) {
-      console.error('Error fetching top products:', error);
+    } catch (e) {
+      console.error('Error fetching top products:', e);
     } finally {
       setLoadingTopProducts(false);
     }
@@ -111,8 +116,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate}) => {
       setLoadingInventoryValue(true);
       const data = await reportsService.getInventoryValue();
       setInventoryValue(data);
-    } catch (error) {
-      console.error('Error fetching inventory value:', error);
+    } catch (e) {
+      console.error('Error fetching inventory value:', e);
     } finally {
       setLoadingInventoryValue(false);
     }
@@ -127,119 +132,145 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate}) => {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>Panel de Control</Text>
+      <ScrollView showsVerticalScrollIndicator={false}>
+
+        {/* ── Hero Header ── */}
+        <View style={styles.hero}>
+          <Text style={styles.heroGreeting}>Droguería Laureano Gómez</Text>
+          <Text style={styles.heroTitle}>Inicio</Text>
+          <Text style={styles.heroSubtitle}>{getTodayLabel()}</Text>
+          <View style={styles.heroAccentLine} />
         </View>
 
-        <Text style={styles.cardTitle}>Módulos de Acceso Rápido</Text>
-        <View style={styles.modulesRow}>
-          <Button
-            title="Ventas (POS)"
-            variant="primary"
-            onPress={() => onNavigate('sales')}
-          />
-          <Button
-            title="Inventario"
-            variant="primary"
-            onPress={() => onNavigate('inventory')}
-          />
-        </View>
+        <View style={styles.contentWrapper}>
 
-        <View style={styles.dashboardGrid}>
-          {/* Historial de Ventas */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Ventas Recientes</Text>
-            {loadingSales ? (
-              <ActivityIndicator size="small" color="#007AFF" />
-            ) : sales.length === 0 ? (
-              <Text style={styles.emptyText}>No hay ventas registradas en los últimos 30 días.</Text>
-            ) : (
-              <ScrollView style={styles.salesList} nestedScrollEnabled>
-                {sales.map(sale => (
+          {/* ─────────────────────────── SECCIÓN: VENTAS ─────────────────────────── */}
+          <Text style={styles.sectionLabel}>Historial de ventas · últimos 30 días</Text>
+          <View style={styles.dashboardGrid}>
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={[styles.cardIconWrap, styles.cardIconWrapTeal]}>
+                  <Icon name="history" size={18} color={TEAL} />
+                </View>
+                <Text style={styles.cardTitle}>Ventas Recientes</Text>
+                <Text style={styles.cardBadge}>{sales.length} reg.</Text>
+              </View>
+
+              {loadingSales ? (
+                <ActivityIndicator size="small" color={TEAL} style={{marginVertical: 24}} />
+              ) : sales.length === 0 ? (
+                <Text style={styles.emptyText}>No hay ventas en los últimos 30 días.</Text>
+              ) : (
+                <ScrollView style={styles.salesList} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                  {sales.map(sale => (
+                    <TouchableOpacity
+                      key={sale.id}
+                      style={styles.saleRow}
+                      onPress={() => handleOpenReceipt(sale.id)}
+                      activeOpacity={0.7}>
+                      <View style={styles.saleLeftDot} />
+                      <View style={styles.saleInfo}>
+                        <Text style={styles.saleId}>Venta #{sale.id}</Text>
+                        <Text style={styles.saleDate}>
+                          {sale.createdAt ? formatDate(sale.createdAt) : 'Sin fecha'}
+                        </Text>
+                      </View>
+                      <View style={styles.saleTotalWrap}>
+                        <Text style={styles.saleTotal}>{formatCurrency(sale.total)}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+
+          {/* ─────────────────────────── SECCIÓN: ANÁLISIS ─────────────────────────── */}
+          <Text style={styles.sectionLabel}>Análisis</Text>
+          <View style={styles.dashboardGrid}>
+
+            {/* Ranking de productos */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={[styles.cardIconWrap, styles.cardIconWrapIndigo]}>
+                  <Icon name="reports" size={18} color={INDIGO} />
+                </View>
+                <Text style={styles.cardTitle}>Productos más vendidos</Text>
+              </View>
+
+              <View style={styles.chipRow}>
+                {([7, 30, 'all'] as const).map(days => (
                   <TouchableOpacity
-                    key={sale.id}
-                    style={styles.saleRow}
-                    onPress={() => handleOpenReceipt(sale.id)}>
-                    <View style={styles.saleInfo}>
-                      <Text style={styles.saleId}>
-                        Venta #{sale.id}
-                      </Text>
-                      <Text style={styles.saleDate}>
-                        {sale.createdAt ? formatDate(sale.createdAt) : 'Sin fecha'}
-                      </Text>
-                    </View>
-                    <Text style={styles.saleTotal}>
-                      {formatCurrency(sale.total)}
+                    key={days.toString()}
+                    style={[styles.chip, rankingPeriod === days && styles.chipActive]}
+                    onPress={() => setRankingPeriod(days as any)}
+                    activeOpacity={0.75}>
+                    <Text style={[styles.chipText, rankingPeriod === days && styles.chipTextActive]}>
+                      {days === 'all' ? 'Todo' : `${days} días`}
                     </Text>
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
-            )}
-          </View>
-
-          {/* Ranking de Productos */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Productos más vendidos</Text>
-            <View style={styles.chipRow}>
-              {[7, 30, 'all'].map(days => (
-                <TouchableOpacity
-                  key={days.toString()}
-                  style={[styles.chip, rankingPeriod === days && styles.chipActive]}
-                  onPress={() => setRankingPeriod(days as any)}>
-                  <Text style={[styles.chipText, rankingPeriod === days && styles.chipTextActive]}>
-                    {days === 'all' ? 'Todo' : `${days} d`}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            
-            {loadingTopProducts ? (
-              <ActivityIndicator size="small" color="#007AFF" />
-            ) : topProducts.length === 0 ? (
-              <Text style={styles.emptyText}>No hay productos vendidos en este período.</Text>
-            ) : (
-              topProducts.map((prod, index) => (
-                <View key={prod.product_id} style={styles.rankingItem}>
-                  <Text style={styles.rankingName}>
-                    {index + 1}. {prod.product_name}
-                  </Text>
-                  <Text style={styles.rankingQty}>{prod.total_quantity} ud.</Text>
-                </View>
-              ))
-            )}
-          </View>
-
-          {/* Valor del Inventario */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Valor del Inventario</Text>
-            {loadingInventoryValue ? (
-              <ActivityIndicator size="small" color="#007AFF" />
-            ) : !inventoryValue ? (
-              <Text style={styles.emptyText}>No se pudo cargar el valor del inventario.</Text>
-            ) : (
-              <View style={styles.inventoryValueContainer}>
-                {/* Capital Invertido */}
-                <View style={{alignItems: 'center', marginBottom: 20}}>
-                  <Text style={styles.inventoryValueText}>
-                    {formatCurrency(inventoryValue.total_purchase_value)}
-                  </Text>
-                  <Text style={styles.inventoryValueSub}>
-                    Capital invertido (Precio de Compra)
-                  </Text>
-                </View>
-                
-                {/* Valor Esperado */}
-                <View style={{alignItems: 'center', paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F3F4F6', width: '100%'}}>
-                  <Text style={[styles.inventoryValueText, {color: '#10B981', fontSize: 28}]}>
-                    {formatCurrency(inventoryValue.total_sale_value)}
-                  </Text>
-                  <Text style={styles.inventoryValueSub}>
-                    Valor esperado (Precio de Venta)
-                  </Text>
-                </View>
               </View>
-            )}
+
+              {loadingTopProducts ? (
+                <ActivityIndicator size="small" color={TEAL} style={{marginVertical: 24}} />
+              ) : topProducts.length === 0 ? (
+                <Text style={styles.emptyText}>No hay productos vendidos en este período.</Text>
+              ) : (
+                topProducts.map((prod, index) => (
+                  <View key={prod.product_id} style={styles.rankingItem}>
+                    <View style={[styles.rankingBadge, index === 0 && styles.rankingBadgeTop]}>
+                      <Text style={[styles.rankingBadgeText, index === 0 && styles.rankingBadgeTextTop]}>
+                        {index + 1}
+                      </Text>
+                    </View>
+                    <Text style={styles.rankingName} numberOfLines={1}>{prod.product_name}</Text>
+                    <View style={styles.rankingQtyWrap}>
+                      <Text style={styles.rankingQty}>{prod.total_quantity} ud.</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* Valor del Inventario */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={[styles.cardIconWrap, styles.cardIconWrapAmber]}>
+                  <Icon name="inventory" size={18} color={AMBER} />
+                </View>
+                <Text style={styles.cardTitle}>Valor del Inventario</Text>
+              </View>
+
+              {loadingInventoryValue ? (
+                <ActivityIndicator size="small" color={TEAL} style={{marginVertical: 24}} />
+              ) : !inventoryValue ? (
+                <Text style={styles.emptyText}>No se pudo cargar el valor del inventario.</Text>
+              ) : (
+                <View style={styles.inventoryValueContainer}>
+                  {/* Capital Invertido */}
+                  <View style={styles.inventoryMetricRow}>
+                    <View>
+                      <Text style={styles.inventoryMetricLabel}>Capital invertido</Text>
+                      <Text style={[styles.inventoryMetricValue, styles.inventoryMetricValueTeal]}>
+                        {formatCurrency(inventoryValue.total_purchase_value)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Valor Esperado */}
+                  <View style={styles.inventoryMetricRow}>
+                    <View>
+                      <Text style={styles.inventoryMetricLabel}>Valor esperado (venta)</Text>
+                      <Text style={[styles.inventoryMetricValue, styles.inventoryMetricValueIndigo]}>
+                        {formatCurrency(inventoryValue.total_sale_value)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </View>
+
           </View>
         </View>
       </ScrollView>
