@@ -120,4 +120,26 @@ export const homeStyles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
   },
+  chipRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+  },
+  chipActive: {
+    backgroundColor: PRIMARY,
+  },
+  chipText: {
+    fontSize: 12,
+    color: '#4B5563',
+  },
+  chipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
 });

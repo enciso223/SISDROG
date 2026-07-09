@@ -8,6 +8,19 @@ export interface SalesReport {
   date_to?: string;
 }
 
+export interface TopProductItem {
+  product_id: number;
+  product_name: string;
+  total_quantity: number;
+  total_revenue: number;
+}
+
+export interface TopProductsResponse {
+  products: TopProductItem[];
+  date_from?: string;
+  date_to?: string;
+}
+
 export interface ReportsFilters {
   dateFrom?: string;
   dateTo?: string;
@@ -23,6 +36,19 @@ class ReportsService {
     const url = `/reports/sales${qs ? '?' + qs : ''}`;
     
     const response = await apiClient.get<SalesReport>(url);
+    return response.data;
+  }
+
+  async getTopProducts(filters: ReportsFilters = {}, limit: number = 10): Promise<TopProductsResponse> {
+    const params = new URLSearchParams();
+    params.append('limit', limit.toString());
+    if (filters.dateFrom) params.append('date_from', filters.dateFrom);
+    if (filters.dateTo) params.append('date_to', filters.dateTo);
+
+    const qs = params.toString();
+    const url = `/reports/top-products?${qs}`;
+    
+    const response = await apiClient.get<TopProductsResponse>(url);
     return response.data;
   }
 }

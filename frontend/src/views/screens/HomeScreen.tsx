@@ -13,6 +13,7 @@ import {
 import {Button, ReceiptModal} from '../components';
 import type {AppScreen} from '../components/Sidebar';
 import {salesService} from '../../services/SalesService';
+import {reportsService, TopProductItem} from '../../services/ReportsService';
 import {Sale} from '../../models';
 import {homeStyles as styles} from './HomeScreen.styles';
 
@@ -22,12 +23,6 @@ interface HomeScreenProps {
 
 // Datos estáticos temporales
 const STATIC_INVENTORY_VALUE = 4550000;
-const STATIC_TOP_PRODUCTS = [
-  {id: 1, name: 'Paracetamol 500mg', qty: 145},
-  {id: 2, name: 'Ibuprofeno 400mg', qty: 98},
-  {id: 3, name: 'Vitamina C', qty: 76},
-  {id: 4, name: 'Amoxicilina 500mg', qty: 54},
-];
 
 const formatCurrency = (amount: number) => {
   const intPart = Math.floor(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -49,6 +44,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate}) => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loadingSales, setLoadingSales] = useState(true);
 
+  // Ranking de productos
+  const [topProducts, setTopProducts] = useState<TopProductItem[]>([]);
+  const [loadingTopProducts, setLoadingTopProducts] = useState(true);
+  const [rankingPeriod, setRankingPeriod] = useState<number | 'all'>(30);
+
   // Estado para el modal de recibo
   const [isReceiptVisible, setIsReceiptVisible] = useState(false);
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
@@ -56,6 +56,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate}) => {
   useEffect(() => {
     fetchSales();
   }, []);
+
+  useEffect(() => {
+    fetchTopProducts(rankingPeriod);
+  }, [rankingPeriod]);
 
   const fetchSales = async () => {
     try {
@@ -78,6 +82,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate}) => {
       console.error('Error fetching sales:', error);
     } finally {
       setLoadingSales(false);
+    }
+  };
+
+  const fetchTopProducts = async (period: number | 'all') => {
+    try {
+      setLoadingTopProducts(true);
+      const filters: any = {};
+      
+      if (period !== 'all') {
+        const fromDate = new Date();
+        fromDate.setDate(fromDate.getDate() - period);
+        filters.dateFrom = fromDate.toISOString().split('T')[0];
+      }
+
+      const response = await reportsService.getTopProducts(filters, 5);
+      setTopProducts(response.products || []);
+    } catch (error) {
+      console.error('Error fetching top products:', error);
+    } finally {
+      setLoadingTopProducts(false);
     }
   };
 
@@ -141,18 +165,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate}) => {
             )}
           </View>
 
-          {/* Ranking de Productos (Estático por ahora) */}
+          {/* Ranking de Productos */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Productos más vendidos</Text>
-            {STATIC_TOP_PRODUCTS.map((prod, index) => (
-              <View key={prod.id} style={styles.rankingItem}>
-                <Text style={styles.rankingName}>
-                  {index + 1}. {prod.name}
-                </Text>
-                <Text style={styles.rankingQty}>{prod.qty} ud.</Text>
-              </View>
-            ))}
-            <Text style={styles.emptyText}>* Datos simulados</Text>
+            <View style={styles.chipRow}>
+              {[7, 30, 'all'].map(days => (
+                <TouchableOpacity
+                  key={days.toString()}
+                  style={[styles.chip, rankingPeriod === days && styles.chipActive]}
+                  onPress={() => setRankingPeriod(days as any)}>
+                  <Text style={[styles.chipText, rankingPeriod === days && styles.chipTextActive]}>
+                    {days === 'all' ? 'Todo' : `${days} d`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            {loadingTopProducts ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : topProducts.length === 0 ? (
+              <Text style={styles.emptyText}>No hay productos vendidos en este período.</Text>
+            ) : (
+              topProducts.map((prod, index) => (
+                <View key={prod.product_id} style={styles.rankingItem}>
+                  <Text style={styles.rankingName}>
+                    {index + 1}. {prod.product_name}
+                  </Text>
+                  <Text style={styles.rankingQty}>{prod.total_quantity} ud.</Text>
+                </View>
+              ))
+            )}
           </View>
 
           {/* Valor del Inventario (Estático por ahora) */}
