@@ -107,9 +107,10 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
       <View style={styles.card}>
         {/* Logo */}
         <View style={styles.logo}>
-          <Text style={styles.logoText}>F</Text>
+          <Text style={styles.logoText}>D</Text>
         </View>
 
+        <Text style={{fontSize: 15, fontWeight: '600', color: '#0078D4', marginBottom: 8}}>Droguería Laureano Gómez</Text>
         <Text style={styles.title}>Crear cuenta</Text>
         <Text style={styles.subtitle}>Completa los datos para registrarte</Text>
 
