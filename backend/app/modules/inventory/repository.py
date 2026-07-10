@@ -45,7 +45,6 @@ class ProductLotRepository:
                 ProductLot.is_active == True,
                 Product.is_active == True,
                 ProductLot.expiry_date <= cutoff,
-                ProductLot.expiry_date >= date.today(),
                 ProductLot.stock > 0
             )
             .order_by(ProductLot.expiry_date.asc())

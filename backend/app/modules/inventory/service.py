@@ -44,11 +44,7 @@ class ProductLotService:
         if not product or not product.is_active:
             raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-        if data.expiry_date <= date.today():
-            raise HTTPException(
-                status_code=400,
-                detail="La fecha de vencimiento debe ser futura"
-            )
+        # Se permite fecha de vencimiento pasada porque el frontend gestiona la confirmación explícita.
 
         lot = ProductLot(
             product_id=product_id,
@@ -137,13 +133,6 @@ class ProductService:
                             dup_lot.is_active = True
                             dup_lot.stock = lot_data.stock
                             
-                            # Actualizar fecha si es necesario y válida
-                            if lot_data.expiry_date <= date.today():
-                                db.rollback()
-                                raise HTTPException(
-                                    status_code=400,
-                                    detail=f"El lote '{lot_data.lot_number}' tiene fecha de vencimiento pasada o de hoy",
-                                )
                             dup_lot.expiry_date = lot_data.expiry_date
                             
                             p.stock = sum(l.stock for l in p.lots if l.is_active)
@@ -164,12 +153,6 @@ class ProductService:
 
         if lots_data:
             for lot_data in lots_data:
-                if lot_data.expiry_date <= date.today():
-                    db.rollback()
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"El lote '{lot_data.lot_number}' tiene fecha de vencimiento pasada o de hoy",
-                    )
                 lot = ProductLot(product_id=product.id, **lot_data.model_dump())
                 db.add(lot)
 

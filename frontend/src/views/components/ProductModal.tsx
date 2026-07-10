@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  Alert,
 } from 'react-native';
 import {Input} from './Input';
 import {Icon, IconName} from './Icon';
@@ -234,6 +235,29 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
   const handleSave = () => {
     if (validate()) {
+      if (formData.expirationDate) {
+        // Aseguramos que tome la fecha local sin problemas de zona horaria usando T00:00:00
+        const expDate = new Date(`${formData.expirationDate}T00:00:00`);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (expDate <= today) {
+          Alert.alert(
+            'Producto Vencido',
+            'La fecha de vencimiento ingresada indica que el producto ya está vencido o vence hoy. ¿Está seguro que desea registrarlo?',
+            [
+              {text: 'Cancelar', style: 'cancel'},
+              {
+                text: 'Sí, registrar',
+                style: 'destructive',
+                onPress: () => onSave(formData as ProductCreate, product?.id),
+              },
+            ],
+          );
+          return;
+        }
+      }
+
       onSave(formData as ProductCreate, product?.id);
     }
   };
