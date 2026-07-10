@@ -22,7 +22,7 @@ import {
 import {usePOSController} from '../../controllers';
 import {Product, Sale, SaleReceipt} from '../../models';
 import {TAX_RATE} from '../../config/constants';
-import {Icon, ReceiptModal} from '../components';
+import {Icon, ReceiptModal, PaymentModal} from '../components';
 import {PAYMENT_ICON} from '../../assets/paymentIcon';
 import {salesStyles as styles, PRIMARY} from './SalesScreen.styles';
 
@@ -33,6 +33,7 @@ if (
 ) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+
 
 // ─── Componentes Secundarios ──────────────────────────────────────
 
@@ -104,9 +105,10 @@ interface ProductCardProps {
   product: Product;
   quantityInCart: number;
   onPress: (product: Product) => void;
+  onDecrease: (productId: number) => void;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({product, quantityInCart, onPress}) => {
+const ProductCard: React.FC<ProductCardProps> = ({product, quantityInCart, onPress, onDecrease}) => {
   const currentStock = product.stock - quantityInCart;
   const outOfStock = currentStock <= 0;
   const lowStock = !outOfStock && currentStock <= (product.minStock ?? 0);
@@ -178,6 +180,11 @@ const ProductCard: React.FC<ProductCardProps> = ({product, quantityInCart, onPre
         <Text style={styles.productLab} numberOfLines={1}>
           {product.laboratory ?? 'Genérico'}
         </Text>
+        {product.lotNumber && (
+          <Text style={styles.productLab} numberOfLines={1}>
+            Lote: {product.lotNumber}
+          </Text>
+        )}
         {expirationAlert && (
           <Text
             style={[
@@ -192,8 +199,23 @@ const ProductCard: React.FC<ProductCardProps> = ({product, quantityInCart, onPre
 
       <View style={styles.productFooter}>
         <Text style={styles.productPrice}>{formatCurrency(product.salePrice)}</Text>
-        <View style={styles.addButton}>
-          <Text style={styles.addButtonText}>+</Text>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          {quantityInCart > 0 && (
+            <TouchableOpacity 
+              style={styles.removeButton} 
+              onPress={() => onDecrease(product.id as number)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.removeButtonText}>-</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity 
+            style={styles.addButton} 
+            onPress={() => onPress(product)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.addButtonText}>+</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Pressable>
@@ -210,6 +232,7 @@ interface CartItemRowProps {
   };
   onIncrease: () => void;
   onDecrease: () => void;
+  onUpdateQuantity: (quantity: number) => void;
   onRemove: () => void;
 }
 
@@ -217,35 +240,64 @@ const CartItemRow: React.FC<CartItemRowProps> = ({
   item,
   onIncrease,
   onDecrease,
+  onUpdateQuantity,
   onRemove,
-}) => (
-  <View style={styles.cartItem}>
-    <View style={styles.cartItemHeader}>
-      <Text style={styles.cartItemName} numberOfLines={2}>
-        {item.productName}
-      </Text>
-      <TouchableOpacity
-        onPress={onRemove}
-        activeOpacity={0.6}
-        style={styles.cartItemRemoveBtn}>
-        <Icon name="delete" size={16} color="#EF4444" />
-      </TouchableOpacity>
-    </View>
-    <View style={styles.cartItemFooter}>
-      <View style={styles.cartQtyControls}>
-        <QuantityButton label="−" onPress={onDecrease} variant="ghost" />
-        <Text style={styles.cartQty}>{item.quantity}</Text>
-        <QuantityButton label="+" onPress={onIncrease} variant="ghost" />
-      </View>
-      <View style={styles.cartItemTotals}>
-        <Text style={styles.cartItemSubtotal}>{formatCurrency(item.subtotal)}</Text>
-        <Text style={styles.cartItemUnitPrice}>
-          {item.quantity} × {formatCurrency(item.unitPrice)}
+}) => {
+  const [textValue, setTextValue] = React.useState(item.quantity.toString());
+
+  React.useEffect(() => {
+    setTextValue(item.quantity.toString());
+  }, [item.quantity]);
+
+  const handleBlur = () => {
+    const qty = parseInt(textValue, 10);
+    if (!isNaN(qty) && qty > 0) {
+      onUpdateQuantity(qty);
+    }
+    // Set a small timeout to allow the parent state to update if valid,
+    // otherwise it will revert the text back to the last known good quantity.
+    setTimeout(() => {
+      setTextValue(item.quantity.toString());
+    }, 50);
+  };
+
+  return (
+    <View style={styles.cartItem}>
+      <View style={styles.cartItemHeader}>
+        <Text style={styles.cartItemName} numberOfLines={2}>
+          {item.productName}
         </Text>
+        <TouchableOpacity
+          onPress={onRemove}
+          activeOpacity={0.6}
+          style={styles.cartItemRemoveBtn}>
+          <Icon name="delete" size={16} color="#EF4444" />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.cartItemFooter}>
+        <View style={styles.cartQtyControls}>
+          <QuantityButton label="−" onPress={onDecrease} variant="ghost" />
+          <TextInput
+            style={styles.cartQtyInput}
+            value={textValue}
+            onChangeText={setTextValue}
+            onBlur={handleBlur}
+            onSubmitEditing={handleBlur}
+            keyboardType="numeric"
+            selectTextOnFocus
+          />
+          <QuantityButton label="+" onPress={onIncrease} variant="ghost" />
+        </View>
+        <View style={styles.cartItemTotals}>
+          <Text style={styles.cartItemSubtotal}>{formatCurrency(item.subtotal)}</Text>
+          <Text style={styles.cartItemUnitPrice}>
+            {item.quantity} × {formatCurrency(item.unitPrice)}
+          </Text>
+        </View>
       </View>
     </View>
-  </View>
-);
+  );
+};
 
 // ─── Componente Principal ─────────────────────────────────────────
 
@@ -258,7 +310,6 @@ export const SalesScreen: React.FC = () => {
     cart,
     subtotal,
     tax,
-    discount,
     total,
     isDonation,
     setIsDonation,
@@ -269,20 +320,20 @@ export const SalesScreen: React.FC = () => {
     addToCart: _addToCart,
     updateQuantity,
     removeFromCart: _removeFromCart,
-    applyDiscount,
     clearCart: _clearCart,
     finalizeSale,
   } = usePOSController();
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const [editingDiscount, setEditingDiscount] = useState(false);
-  const [discountInput, setDiscountInput] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(true);
 
   const [lastSaleId, setLastSaleId] = useState<number | null>(null);
   const [demoSale, setDemoSale] = useState<Sale | null>(null);
   const [localReceipt, setLocalReceipt] = useState<SaleReceipt | null>(null);
   const [isReceiptVisible, setIsReceiptVisible] = useState(false);
+
+  // Modal de cobro
+  const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
 
   // Wrappers con animación
   const addToCart = (p: Product) => {
@@ -328,7 +379,22 @@ export const SalesScreen: React.FC = () => {
     }
   };
 
+  // Abre el modal de cobro (solo para ventas normales, no donaciones)
+  const handleCheckoutPress = () => {
+    if (cart.length === 0) {
+      Alert.alert('Carrito vacío', 'Agrega productos antes de finalizar.');
+      return;
+    }
+    if (isDonation) {
+      // Las donaciones no requieren cobro, pasar directo
+      handleFinalize();
+    } else {
+      setIsPaymentModalVisible(true);
+    }
+  };
+
   const handleFinalize = async () => {
+    setIsPaymentModalVisible(false);
     if (cart.length === 0) {
       Alert.alert('Carrito vacío', 'Agrega productos antes de finalizar.');
       return;
@@ -387,19 +453,6 @@ export const SalesScreen: React.FC = () => {
       ],
     );
   };
-
-  const openDiscountInput = () => {
-    setDiscountInput(discount > 0 ? discount.toFixed(2) : '');
-    setEditingDiscount(true);
-  };
-
-  const commitDiscount = () => {
-    const amount = parseFloat(discountInput);
-    applyDiscount(Number.isNaN(amount) ? 0 : amount);
-    setEditingDiscount(false);
-  };
-
-  const cancelDiscount = () => setEditingDiscount(false);
 
   return (
     <View style={styles.container}>
@@ -479,7 +532,12 @@ export const SalesScreen: React.FC = () => {
                 <View
                   key={product.id ?? product.code}
                   style={styles.productCardWrapper}>
-                  <ProductCard product={product} quantityInCart={quantityInCart} onPress={addToCart} />
+                  <ProductCard 
+                    product={product} 
+                    quantityInCart={quantityInCart} 
+                    onPress={addToCart} 
+                    onDecrease={handleDecrease}
+                  />
                 </View>
               );
             })}
@@ -537,6 +595,7 @@ export const SalesScreen: React.FC = () => {
                   item={item}
                   onIncrease={() => handleIncrease(item.productId)}
                   onDecrease={() => handleDecrease(item.productId)}
+                  onUpdateQuantity={(qty) => updateQuantity(item.productId, qty)}
                   onRemove={() => removeFromCart(item.productId)}
                 />
               ))
@@ -572,7 +631,7 @@ export const SalesScreen: React.FC = () => {
               <Text style={styles.summaryValue}>{formatCurrency(subtotal)}</Text>
             </View>
 
-            {isDonation ? (
+            {isDonation && (
               <View style={styles.summaryRow}>
                 <Text style={[styles.summaryLabel, styles.discountLabel]}>
                   Donación
@@ -581,37 +640,6 @@ export const SalesScreen: React.FC = () => {
                   -{formatCurrency(subtotal)}
                 </Text>
               </View>
-            ) : editingDiscount ? (
-              <View style={styles.discountInputRow}>
-                <Text style={[styles.summaryLabel, styles.discountLabel]}>
-                  Descuento
-                </Text>
-                <TextInput
-                  style={styles.discountInput}
-                  value={discountInput}
-                  onChangeText={setDiscountInput}
-                  keyboardType="numeric"
-                  autoFocus
-                  selectTextOnFocus
-                  onBlur={commitDiscount}
-                  onSubmitEditing={commitDiscount}
-                />
-                <TouchableOpacity onPress={cancelDiscount} activeOpacity={0.7}>
-                  <Text style={styles.discountCancel}>✕</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.summaryRow}
-                onPress={openDiscountInput}
-                activeOpacity={0.7}>
-                <Text style={[styles.summaryLabel, styles.discountLabel]}>
-                  Descuento
-                </Text>
-                <Text style={[styles.summaryValue, styles.discountValue]}>
-                  -{formatCurrency(discount)}
-                </Text>
-              </TouchableOpacity>
             )}
 
             <View style={styles.divider} />
@@ -636,7 +664,7 @@ export const SalesScreen: React.FC = () => {
                   (cart.length === 0 || isProcessing) &&
                     styles.checkoutButtonDisabled,
                 ]}
-                onPress={handleFinalize}
+                onPress={handleCheckoutPress}
                 disabled={cart.length === 0 || isProcessing}
                 activeOpacity={0.9}>
                 {isProcessing ? (
@@ -661,6 +689,14 @@ export const SalesScreen: React.FC = () => {
           </View>
         </View>
       )}
+
+      {/* ─── Modal de Cobro ─── */}
+      <PaymentModal
+        visible={isPaymentModalVisible}
+        total={total}
+        onConfirm={handleFinalize}
+        onCancel={() => setIsPaymentModalVisible(false)}
+      />
 
       {/* ─── Modal de Comprobante ─── */}
       <ReceiptModal
@@ -722,3 +758,4 @@ const donationToggleStyles = StyleSheet.create({
     marginTop: 1,
   },
 });
+
