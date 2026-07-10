@@ -25,7 +25,6 @@ export interface UsePOSControllerReturn {
   cart: CartItem[];
   subtotal: number;
   tax: number;
-  discount: number;
   total: number;
   isDonation: boolean;
   setIsDonation: (value: boolean) => void;
@@ -36,7 +35,6 @@ export interface UsePOSControllerReturn {
   addToCart: (product: Product) => void;
   updateQuantity: (productId: number, quantity: number) => void;
   removeFromCart: (productId: number) => void;
-  applyDiscount: (amount: number) => void;
   clearCart: () => void;
   finalizeSale: (paymentMethod?: PaymentMethod) => Promise<Sale | undefined>;
 }
@@ -50,7 +48,6 @@ export const usePOSController = (): UsePOSControllerReturn => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [discount, setDiscount] = useState(0);
   // Cuando está activo, la venta actual se registra como donación de salida
   // (el precio a pagar es $0 y el inventario disminuye vía /donations).
   const [isDonation, setIsDonation] = useState(false);
@@ -140,8 +137,9 @@ export const usePOSController = (): UsePOSControllerReturn => {
       }
 
       const product = products.find(p => p.id === productId);
+      let finalQuantity = quantity;
       if (product && quantity > product.stock) {
-        return;
+        finalQuantity = product.stock;
       }
 
       setCart(prev =>
@@ -149,8 +147,8 @@ export const usePOSController = (): UsePOSControllerReturn => {
           item.productId === productId
             ? {
                 ...item,
-                quantity,
-                subtotal: quantity * item.unitPrice,
+                quantity: finalQuantity,
+                subtotal: finalQuantity * item.unitPrice,
               }
             : item,
         ),
@@ -163,13 +161,8 @@ export const usePOSController = (): UsePOSControllerReturn => {
     setCart(prev => prev.filter(item => item.productId !== productId));
   }, []);
 
-  const applyDiscount = useCallback((amount: number) => {
-    setDiscount(Math.max(0, amount));
-  }, []);
-
   const clearCart = useCallback(() => {
     setCart([]);
-    setDiscount(0);
     setIsDonation(false);
   }, []);
 
@@ -182,8 +175,8 @@ export const usePOSController = (): UsePOSControllerReturn => {
 
   const total = useMemo(
     // En una donación de salida el precio a pagar siempre es $0.
-    () => (isDonation ? 0 : subtotal + tax - discount),
-    [subtotal, tax, discount, isDonation],
+    () => (isDonation ? 0 : subtotal + tax),
+    [subtotal, tax, isDonation],
   );
 
   const finalizeSale = useCallback(
@@ -225,6 +218,11 @@ export const usePOSController = (): UsePOSControllerReturn => {
           isDonation: true,
           createdAt: new Date().toISOString(),
         };
+        // Actualizar el stock localmente para que la vista se refresque
+        setProducts(prev => prev.map(p => {
+          const cartItem = cart.find(c => c.productId === p.id);
+          return cartItem ? { ...p, stock: p.stock - cartItem.quantity } : p;
+        }));
         clearCart();
         return donationSale;
       }
@@ -239,6 +237,11 @@ export const usePOSController = (): UsePOSControllerReturn => {
       };
 
       if (DEMO_MODE) {
+        // Actualizar el stock localmente para que la vista se refresque
+        setProducts(prev => prev.map(p => {
+          const cartItem = cart.find(c => c.productId === p.id);
+          return cartItem ? { ...p, stock: p.stock - cartItem.quantity } : p;
+        }));
         clearCart();
         return {
           id: 999,
@@ -257,10 +260,13 @@ export const usePOSController = (): UsePOSControllerReturn => {
       }
 
       const sale = await salesService.create(saleData);
-      // We don't clearCart here anymore, we'll clear it after the receipt is closed.
-      // But wait, if we return it, the screen can handle clearCart.
-      // Let's remove clearCart() from here so the receipt can still see the cart if needed,
-      // or we can clear it. Actually, `sale` has all info, so we can clearCart.
+      
+      // Actualizar el stock localmente para que la vista se refresque de inmediato
+      setProducts(prev => prev.map(p => {
+        const cartItem = cart.find(c => c.productId === p.id);
+        return cartItem ? { ...p, stock: p.stock - cartItem.quantity } : p;
+      }));
+      
       clearCart();
       return sale;
     },
@@ -276,7 +282,6 @@ export const usePOSController = (): UsePOSControllerReturn => {
     cart,
     subtotal,
     tax,
-    discount,
     total,
     isDonation,
     setIsDonation,
@@ -287,7 +292,6 @@ export const usePOSController = (): UsePOSControllerReturn => {
     addToCart,
     updateQuantity,
     removeFromCart,
-    applyDiscount,
     clearCart,
     finalizeSale,
   };

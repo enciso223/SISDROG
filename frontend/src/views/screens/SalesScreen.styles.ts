@@ -202,6 +202,17 @@ export const salesStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  removeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
 
   /* ─── Badges de stock ─── */
   stockBadge: {
@@ -312,6 +323,7 @@ export const salesStyles = StyleSheet.create({
     backgroundColor: '#FAFAFA',
     borderWidth: 1,
     borderColor: '#F1F5F9',
+    alignContent: 'center',
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
@@ -354,6 +366,19 @@ export const salesStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: TEXT_MAIN,
+  },
+  cartQtyInput: {
+    width: 40,
+    textAlign: 'center',
+    alignContent: 'center',
+    fontSize: 14,
+    fontWeight: '700',
+    color: TEXT_MAIN,
+    padding: 0,
+    margin: 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 4,
+    height: 24,
   },
   cartItemTotals: {
     alignItems: 'flex-end',
@@ -525,6 +550,14 @@ export const salesStyles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
     includeFontPadding: false,
+  },
+  removeButtonText: {
+    color: '#EF4444',
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    includeFontPadding: false,
+    marginTop: -4,
   },
   categoriesScrollContent: {
     paddingRight: 16,

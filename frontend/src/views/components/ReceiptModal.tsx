@@ -7,6 +7,10 @@ import {
   ActivityIndicator,
   ScrollView,
   Dimensions,
+  Share,
+  Alert,
+  TextInput,
+  Clipboard,
 } from 'react-native';
 import {salesService} from '../../services';
 import {SaleReceipt, Sale} from '../../models';
@@ -32,6 +36,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const [receipt, setReceipt] = useState<SaleReceipt | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRawText, setShowRawText] = useState(false);
+  const [rawText, setRawText] = useState('');
 
   useEffect(() => {
     // Comprobante local (donaciones): se muestra sin llamar al backend.
@@ -78,6 +84,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     } else if (!visible) {
       setReceipt(null);
       setError(null);
+      setShowRawText(false);
+      setRawText('');
     }
   }, [visible, saleId, demoSale, localReceipt]);
 
@@ -104,6 +112,42 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     return `$${intPart}`;
   };
 
+  const handleShare = async () => {
+    if (!receipt) return;
+    
+    let text = `${receipt.establishment_name || 'SISDROG'}\n`;
+    if (receipt.establishment_address) text += `${receipt.establishment_address}\n`;
+    if (receipt.establishment_phone) text += `Tel: ${receipt.establishment_phone}\n`;
+    text += `--------------------------------\n`;
+    text += `Comprobante: ${receipt.receipt_number}\n`;
+    text += `Fecha: ${formatDate(receipt.created_at)}\n`;
+    if (receipt.sale.isDonation) {
+      text += `*** DONACIÓN ***\n`;
+    }
+    text += `--------------------------------\n`;
+    text += `CANT | DESCRIPCIÓN | IMPORTE\n`;
+    receipt.sale.items.forEach((item: any) => {
+      const name = item.productName || item.product_name || `Prod ID: ${item.productId || item.product_id || '?'}`;
+      const subtotal = item.subtotal || item.sub_total || 0;
+      text += `${item.quantity} x ${name} = ${formatCurrency(subtotal)}\n`;
+    });
+    text += `--------------------------------\n`;
+    text += `TOTAL A PAGAR: ${formatCurrency(receipt.sale.total)}\n`;
+    text += `--------------------------------\n`;
+    text += receipt.sale.isDonation
+      ? 'Comprobante de donación · Sin valor comercial\n'
+      : '¡Gracias por su compra!\n';
+
+    setRawText(text);
+
+    Share.share({
+      message: text,
+      title: `Comprobante ${receipt.receipt_number}`,
+    }).catch((err: any) => {
+      Alert.alert('Aviso', 'No se pudo abrir el menú nativo de compartir de Windows. Copia el texto a continuación.');
+      setShowRawText(true);
+    });
+  };
 
   if (!visible) return null;
 
@@ -210,9 +254,39 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                       : '¡Gracias por su compra!'}
                   </Text>
                 </View>
+
+                {showRawText && (
+                  <View style={styles.rawTextContainer}>
+                    <Text style={styles.rawTextLabel}>Copia el texto del comprobante:</Text>
+                    <TextInput
+                      style={styles.rawTextInput}
+                      value={rawText}
+                      multiline
+                      editable={false}
+                      selectTextOnFocus
+                    />
+                    <TouchableOpacity
+                      style={styles.copyButton}
+                      onPress={() => {
+                        try {
+                          Clipboard.setString(rawText);
+                          Alert.alert('Copiado', 'El comprobante ha sido copiado al portapapeles');
+                        } catch (err) {
+                          Alert.alert('Error', 'No se pudo copiar automáticamente. Por favor, selecciona el texto y cópialo manualmente.');
+                        }
+                      }}>
+                      <Icon name="sales" size={16} color="#FFFFFF" />
+                      <Text style={styles.copyButtonText}>Copiar al portapapeles</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </ScrollView>
 
               <View style={styles.actions}>
+                <TouchableOpacity style={styles.secondaryButton} onPress={handleShare}>
+                  <Icon name="sales" size={18} color="#374151" />
+                  <Text style={styles.secondaryButtonText}>Imprimir / Guardar</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.primaryButton} onPress={onClose}>
                   <Text style={styles.primaryButtonText}>Aceptar y Cerrar</Text>
                 </TouchableOpacity>
@@ -376,6 +450,45 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontStyle: 'italic',
   },
+  rawTextContainer: {
+    marginTop: 10,
+    backgroundColor: '#F3F4F6',
+    padding: 10,
+    borderRadius: 8,
+  },
+  rawTextLabel: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 6,
+  },
+  rawTextInput: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D1D5DB',
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 10,
+    height: 150,
+    textAlignVertical: 'top',
+    fontFamily: 'Consolas',
+    fontSize: 12,
+    color: '#000000',
+  },
+  copyButton: {
+    backgroundColor: '#059669',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    borderRadius: 6,
+    marginTop: 10,
+    gap: 8,
+  },
+  copyButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
   actions: {
     marginTop: 'auto',
     paddingTop: 16,
@@ -388,6 +501,21 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  secondaryButton: {
+    backgroundColor: '#F3F4F6',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 10,
+    gap: 8,
+  },
+  secondaryButtonText: {
+    color: '#374151',
     fontWeight: 'bold',
     fontSize: 16,
   },
