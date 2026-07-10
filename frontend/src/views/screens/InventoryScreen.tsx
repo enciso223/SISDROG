@@ -103,13 +103,26 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack: _onBack
           fetchAlerts();
         } catch (err: any) {
           const status = err?.response?.status;
-          const detail = err?.response?.data?.detail || '';
+          const detail: string = err?.response?.data?.detail || '';
           if (status === 409) {
-            setServerError({field: 'code', message: 'Ya existe este código', ts: Date.now()});
-            Alert.alert(
-              'Código duplicado',
-              `Ya existe un producto con ese código. Usa un código diferente.\n\n${detail}`,
-            );
+            // Determinar si es duplicado real (código + lote) o solo código
+            const isDuplicateLot = detail.toLowerCase().includes('lote');
+            if (isDuplicateLot) {
+              // Par código-lote ya existe → duplicado real
+              setServerError({field: 'lotNumber', message: 'Este lote ya existe para este código', ts: Date.now()});
+              Alert.alert(
+                'Lote duplicado',
+                `Ya existe un producto registrado con ese código de barras Y ese número de lote.\n\n` +
+                `Si recibiste una nueva remesa del mismo medicamento, ingresa un número de lote diferente.\n\n${detail}`,
+              );
+            } else {
+              // Solo código — podría ser otro motivo, mostrar detalle genérico
+              setServerError({field: 'code', message: 'Código duplicado', ts: Date.now()});
+              Alert.alert(
+                'Código duplicado',
+                `Ya existe un producto activo con ese código. Usa un código diferente o ingresa un número de lote distinto.\n\n${detail}`,
+              );
+            }
           } else if (status === 422) {
             Alert.alert(
               'Datos inválidos',
@@ -140,11 +153,25 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack: _onBack
     [updateProduct, createProduct, fetchProducts, fetchAlerts],
   );
 
+
   const handleDeleteProduct = useCallback(
     async (id?: number) => {
       if (id) {
-        await deleteProduct(id);
-        fetchAlerts();
+        Alert.alert(
+          'Eliminar producto',
+          '¿Estás seguro de que deseas eliminar este producto?',
+          [
+            {text: 'Cancelar', style: 'cancel'},
+            {
+              text: 'Eliminar',
+              style: 'destructive',
+              onPress: async () => {
+                await deleteProduct(id);
+                fetchAlerts();
+              },
+            },
+          ],
+        );
       }
     },
     [deleteProduct, fetchAlerts],

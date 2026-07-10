@@ -38,9 +38,9 @@ def get_alerts(
     return product_svc.get_alerts(db, expiry_days)
 
 
-@router.get("/products/code/{code}", response_model=ProductResponse)
-def get_product_by_code(code: str, db: Session = Depends(get_db)):
-    return product_svc.get_by_code(db, code)
+@router.get("/products/code/{code}", response_model=List[ProductResponse])
+def get_products_by_code(code: str, db: Session = Depends(get_db)):
+    return product_svc.get_all_by_code(db, code)
 
 
 @router.get("/products/{product_id}", response_model=ProductResponse)
