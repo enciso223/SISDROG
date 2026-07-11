@@ -14,7 +14,8 @@ import {ReceiptModal, Icon} from '../components';
 import type {AppScreen} from '../components/Sidebar';
 import {salesService} from '../../services/SalesService';
 import {reportsService, TopProductItem, InventoryValueResponse} from '../../services/ReportsService';
-import {Sale} from '../../models';
+import {donationsService, Donation} from '../../services/DonationsService';
+import {Sale, SaleReceipt, PaymentMethod} from '../../models';
 import {homeStyles as styles, TEAL, TEAL_DARK, INDIGO, AMBER} from './HomeScreen.styles';
 
 interface HomeScreenProps {
@@ -53,6 +54,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate: _onNavigate})
   const [sales, setSales] = useState<Sale[]>([]);
   const [loadingSales, setLoadingSales] = useState(true);
 
+  const [donations, setDonations] = useState<Donation[]>([]);
+  const [loadingDonations, setLoadingDonations] = useState(true);
+
   const [topProducts, setTopProducts] = useState<TopProductItem[]>([]);
   const [loadingTopProducts, setLoadingTopProducts] = useState(true);
   const [rankingPeriod, setRankingPeriod] = useState<number | 'all'>(30);
@@ -62,9 +66,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate: _onNavigate})
 
   const [isReceiptVisible, setIsReceiptVisible] = useState(false);
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
+  const [selectedDonation, setSelectedDonation] = useState<Donation | null>(null);
 
   useEffect(() => {
     fetchSales();
+    fetchDonations();
     fetchInventoryValue();
   }, []);
 
@@ -90,6 +96,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate: _onNavigate})
       console.error('Error fetching sales:', e);
     } finally {
       setLoadingSales(false);
+    }
+  };
+
+  const fetchDonations = async () => {
+    try {
+      setLoadingDonations(true);
+      const data = await donationsService.getAll();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const filteredAndSorted = data
+        .filter(d => new Date(d.createdAt ?? 0).getTime() >= thirtyDaysAgo.getTime())
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt ?? 0).getTime() -
+            new Date(a.createdAt ?? 0).getTime(),
+        );
+      setDonations(filteredAndSorted);
+    } catch (e) {
+      console.error('Error fetching donations:', e);
+    } finally {
+      setLoadingDonations(false);
     }
   };
 
@@ -128,6 +155,40 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate: _onNavigate})
       setSelectedSaleId(saleId);
       setIsReceiptVisible(true);
     }
+  };
+
+  const handleOpenDonationReceipt = (donation: Donation) => {
+    setSelectedDonation(donation);
+    setIsReceiptVisible(true);
+  };
+
+  const generateDonationReceipt = (donation: Donation): SaleReceipt => {
+    const isReceived = donation.donationType === 'received';
+    return {
+      id: donation.id,
+      sale_id: donation.id,
+      receipt_number: `DON-${donation.id.toString().padStart(5, '0')}`,
+      establishment_name: 'Droguería Laureano Gómez',
+      created_at: donation.createdAt,
+      sale: {
+        id: donation.id,
+        invoiceNumber: `DON-${donation.id.toString().padStart(5, '0')}`,
+        customerName: isReceived ? 'Entrada por Donación' : 'Salida por Donación',
+        subtotal: 0,
+        tax: 0,
+        total: 0,
+        isDonation: true,
+        createdAt: donation.createdAt,
+        paymentMethod: PaymentMethod.CASH,
+        items: donation.items.map(item => ({
+          productId: item.productId,
+          productName: item.productName || `Producto ID: ${item.productId}`,
+          quantity: item.quantity,
+          unitPrice: 0,
+          subtotal: 0,
+        })),
+      }
+    };
   };
 
   return (
@@ -177,6 +238,48 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate: _onNavigate})
                       </View>
                       <View style={styles.saleTotalWrap}>
                         <Text style={styles.saleTotal}>{formatCurrency(sale.total)}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+
+            {/* Donaciones Recientes */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={[styles.cardIconWrap, styles.cardIconWrapTeal]}>
+                  <Icon name="gift" size={18} color={TEAL} />
+                </View>
+                <Text style={styles.cardTitle}>Donaciones Recientes</Text>
+                <Text style={styles.cardBadge}>{donations.length} reg.</Text>
+              </View>
+
+              {loadingDonations ? (
+                <ActivityIndicator size="small" color={TEAL} style={{marginVertical: 24}} />
+              ) : donations.length === 0 ? (
+                <Text style={styles.emptyText}>No hay donaciones en los últimos 30 días.</Text>
+              ) : (
+                <ScrollView style={styles.salesList} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                  {donations.map(donation => (
+                    <TouchableOpacity
+                      key={donation.id}
+                      style={styles.saleRow}
+                      onPress={() => handleOpenDonationReceipt(donation)}
+                      activeOpacity={0.7}>
+                      <View style={styles.saleLeftDot} />
+                      <View style={styles.saleInfo}>
+                        <Text style={styles.saleId}>
+                          Donación #{donation.id} ({donation.donationType === 'received' ? 'Recibida' : 'Entregada'})
+                        </Text>
+                        <Text style={styles.saleDate}>
+                          {donation.createdAt ? formatDate(donation.createdAt) : 'Sin fecha'}
+                        </Text>
+                      </View>
+                      <View style={styles.saleTotalWrap}>
+                        <Text style={[styles.saleTotal, {color: TEAL, fontSize: 13}]}>
+                          {donation.items.reduce((acc, item) => acc + item.quantity, 0)} items
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -278,7 +381,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({onNavigate: _onNavigate})
       <ReceiptModal
         visible={isReceiptVisible}
         saleId={selectedSaleId}
-        onClose={() => setIsReceiptVisible(false)}
+        demoSale={null}
+        localReceipt={selectedDonation ? generateDonationReceipt(selectedDonation) : null}
+        onClose={() => {
+          setIsReceiptVisible(false);
+          setSelectedSaleId(null);
+          setSelectedDonation(null);
+        }}
       />
     </View>
   );

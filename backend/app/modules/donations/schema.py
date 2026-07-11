@@ -19,6 +19,7 @@ class DonationItemResponse(BaseModel):
     id: int
     product_id: int
     quantity: int
+    product_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -67,6 +68,7 @@ class DonationListResponse(BaseModel):
     donation_date: date
     is_active: bool
     created_at: datetime
+    items: List[DonationItemResponse] = []
 
     class Config:
         from_attributes = True

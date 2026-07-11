@@ -6,7 +6,7 @@ from app.modules.donations.model import Donation, DonationItem, ProductMovement
 class DonationRepository:
 
     def get_all(self, db: Session, skip: int = 0, limit: int = 100, donation_type: Optional[str] = None):
-        query = db.query(Donation).filter(Donation.is_active == True)
+        query = db.query(Donation).options(joinedload(Donation.items)).filter(Donation.is_active == True)
         if donation_type:
             query = query.filter(Donation.donation_type == donation_type)
         return query.order_by(Donation.donation_date.desc()).offset(skip).limit(limit).all()

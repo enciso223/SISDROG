@@ -31,6 +31,10 @@ class DonationItem(Base):
     donation = relationship("Donation", back_populates="items")
     product = relationship("Product")
 
+    @property
+    def product_name(self):
+        return self.product.name if self.product else f"Producto {self.product_id}"
+
 
 class ProductMovement(Base):
     __tablename__ = "product_movements"

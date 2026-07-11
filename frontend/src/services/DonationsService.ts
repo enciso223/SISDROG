@@ -28,6 +28,7 @@ export interface DonationInput {
 interface DonationItemBackend {
   id: number;
   product_id: number;
+  product_name?: string;
   quantity: number;
 }
 
@@ -49,7 +50,7 @@ export interface Donation {
   donationDate: string;
   notes?: string;
   createdAt: string;
-  items: {id: number; productId: number; quantity: number}[];
+  items: {id: number; productId: number; productName?: string; quantity: number}[];
 }
 
 function mapToDonation(data: DonationBackend): Donation {
@@ -60,9 +61,10 @@ function mapToDonation(data: DonationBackend): Donation {
     donationDate: data.donation_date,
     notes: data.notes ?? undefined,
     createdAt: data.created_at,
-    items: data.items.map(i => ({
+    items: (data.items || []).map(i => ({
       id: i.id,
       productId: i.product_id,
+      productName: i.product_name,
       quantity: i.quantity,
     })),
   };
@@ -78,6 +80,13 @@ function todayISO(): string {
 }
 
 class DonationsService {
+  async getAll(type?: DonationType): Promise<Donation[]> {
+    const response = await apiClient.get<DonationBackend[]>('/donations', {
+      params: type ? { donation_type: type } : undefined
+    });
+    return response.data.map(mapToDonation);
+  }
+
   async create(data: DonationInput): Promise<Donation> {
     const payload = {
       donation_type: data.donationType,
