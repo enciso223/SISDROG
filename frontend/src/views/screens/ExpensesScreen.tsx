@@ -105,6 +105,7 @@ export const ExpensesScreen: React.FC = () => {
   // ── Filtro por rango de fechas (texto local) ──
   const [fromDisplay, setFromDisplay] = useState(ISOToDisplay(dateFrom));
   const [toDisplay, setToDisplay] = useState(ISOToDisplay(dateTo));
+  const [filterError, setFilterError] = useState<string | null>(null);
 
   const total = useMemo(
     () => expenses.reduce((sum, e) => sum + (e.amount || 0), 0),
@@ -160,13 +161,22 @@ export const ExpensesScreen: React.FC = () => {
   };
 
   const applyFilters = () => {
-    setDateFrom(displayToISO(fromDisplay));
-    setDateTo(displayToISO(toDisplay));
+    const isoFrom = displayToISO(fromDisplay);
+    const isoTo = displayToISO(toDisplay);
+
+    if (isoFrom && isoTo && isoFrom > isoTo) {
+      setFilterError('El rango de fechas no es válido');
+      return;
+    }
+    setFilterError(null);
+    setDateFrom(isoFrom);
+    setDateTo(isoTo);
   };
 
   const handleClearFilters = () => {
     setFromDisplay('');
     setToDisplay('');
+    setFilterError(null);
     clearFilters();
   };
 
@@ -177,8 +187,8 @@ export const ExpensesScreen: React.FC = () => {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* ── Banner de error ── */}
-        {error && (
+        {/* ── Banner de error general ── */}
+        {error && error !== 'El rango de fechas no es válido' && (
           <View style={styles.errorBanner}>
             <Icon name="warning" size={16} color={DANGER} />
             <Text style={styles.errorBannerText}>{error}</Text>
@@ -270,6 +280,14 @@ export const ExpensesScreen: React.FC = () => {
               </Text>
             </View>
           </View>
+
+          {/* ── Banner de error específico de filtro ── */}
+          {filterError && (
+            <View style={styles.errorBanner}>
+              <Icon name="warning" size={16} color={DANGER} />
+              <Text style={styles.errorBannerText}>{filterError}</Text>
+            </View>
+          )}
 
           <View style={styles.formRow}>
             <View style={styles.formColSmall}>
