@@ -45,7 +45,6 @@ class ProductLotRepository:
                 ProductLot.is_active == True,
                 Product.is_active == True,
                 ProductLot.expiry_date <= cutoff,
-                ProductLot.expiry_date >= date.today(),
                 ProductLot.stock > 0
             )
             .order_by(ProductLot.expiry_date.asc())
@@ -76,8 +75,8 @@ class ProductRepository:
     def get_by_id(self, db: Session, product_id: int):
         return db.query(Product).filter(Product.id == product_id).first()
 
-    def get_by_code(self, db: Session, code: str):
-        return db.query(Product).filter(Product.code == code).first()
+    def get_all_by_code(self, db: Session, code: str):
+        return db.query(Product).filter(Product.code == code).all()
 
     def search(self, db: Session, query: str):
         return db.query(Product).filter(

@@ -9,7 +9,7 @@
  *  - Modal CRUD
  */
 
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useEffect, useState, useCallback, useMemo} from 'react';
 import {
   View,
   Text,
@@ -51,9 +51,19 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack: _onBack
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [serverError, setServerError] = useState<{field: string; message: string; ts: number} | null>(null);
+
+  // Optimización: Debounce de 300ms para no filtrar en cada tecla presionada
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   useEffect(() => {
     fetchProducts();
@@ -61,15 +71,15 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack: _onBack
   }, [fetchProducts, fetchAlerts]);
 
   /* ─── Filtrado por búsqueda ─── */
-  const filteredProducts = products.filter(p => {
-    if (!searchQuery.trim()) {return true;}
+  const filteredProducts = useMemo(() => {
+    if (!searchQuery.trim()) {return products;}
     const q = searchQuery.toLowerCase();
-    return (
+    return products.filter(p =>
       p.name.toLowerCase().includes(q) ||
       p.code.toLowerCase().includes(q) ||
       (p.laboratory || '').toLowerCase().includes(q)
     );
-  });
+  }, [products, searchQuery]);
 
   /* ─── Paginación ─── */
   const totalItems = filteredProducts.length;
@@ -103,13 +113,26 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack: _onBack
           fetchAlerts();
         } catch (err: any) {
           const status = err?.response?.status;
-          const detail = err?.response?.data?.detail || '';
+          const detail: string = err?.response?.data?.detail || '';
           if (status === 409) {
-            setServerError({field: 'code', message: 'Ya existe este código', ts: Date.now()});
-            Alert.alert(
-              'Código duplicado',
-              `Ya existe un producto con ese código. Usa un código diferente.\n\n${detail}`,
-            );
+            // Determinar si es duplicado real (código + lote) o solo código
+            const isDuplicateLot = detail.toLowerCase().includes('lote');
+            if (isDuplicateLot) {
+              // Par código-lote ya existe → duplicado real
+              setServerError({field: 'lotNumber', message: 'Este lote ya existe para este código', ts: Date.now()});
+              Alert.alert(
+                'Lote duplicado',
+                `Ya existe un producto registrado con ese código de barras Y ese número de lote.\n\n` +
+                `Si recibiste una nueva remesa del mismo medicamento, ingresa un número de lote diferente.\n\n${detail}`,
+              );
+            } else {
+              // Solo código — podría ser otro motivo, mostrar detalle genérico
+              setServerError({field: 'code', message: 'Código duplicado', ts: Date.now()});
+              Alert.alert(
+                'Código duplicado',
+                `Ya existe un producto activo con ese código. Usa un código diferente o ingresa un número de lote distinto.\n\n${detail}`,
+              );
+            }
           } else if (status === 422) {
             Alert.alert(
               'Datos inválidos',
@@ -140,11 +163,25 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack: _onBack
     [updateProduct, createProduct, fetchProducts, fetchAlerts],
   );
 
+
   const handleDeleteProduct = useCallback(
     async (id?: number) => {
       if (id) {
-        await deleteProduct(id);
-        fetchAlerts();
+        Alert.alert(
+          'Eliminar producto',
+          '¿Estás seguro de que deseas eliminar este producto?',
+          [
+            {text: 'Cancelar', style: 'cancel'},
+            {
+              text: 'Eliminar',
+              style: 'destructive',
+              onPress: async () => {
+                await deleteProduct(id);
+                fetchAlerts();
+              },
+            },
+          ],
+        );
       }
     },
     [deleteProduct, fetchAlerts],
@@ -202,11 +239,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack: _onBack
           style={styles.searchInput}
           placeholder="Buscar por nombre, código o laboratorio..."
           placeholderTextColor={TEXT_MUTED}
-          value={searchQuery}
-          onChangeText={v => { setSearchQuery(v); setCurrentPage(1); }}
+          value={searchInput}
+          onChangeText={v => setSearchInput(v)}
         />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+        {searchInput.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchInput('')}>
             <Icon name="close" size={13} color={TEXT_MUTED} />
           </TouchableOpacity>
         )}
@@ -254,7 +291,6 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack: _onBack
             data={pageItems}
             keyExtractor={item => item.id?.toString() ?? item.code}
             renderItem={renderItem}
-            scrollEnabled={false}
             ListEmptyComponent={
               <View style={styles.centerContent}>
                 <View style={styles.emptyIcon}>
@@ -262,7 +298,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({onBack: _onBack
                 </View>
                 <Text style={styles.emptyTitle}>No hay productos</Text>
                 <Text style={styles.emptyText}>
-                  {searchQuery
+                  {searchInput
                     ? 'No se encontraron resultados para tu búsqueda.'
                     : 'Agrega tu primer producto al inventario para comenzar.'}
                 </Text>

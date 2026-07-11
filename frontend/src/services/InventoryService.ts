@@ -94,8 +94,9 @@ class InventoryService {
       address: data.address,
     };
 
-    // Si hay número de lote, y NO es Compra ni Donación (estas se gestionan aparte)
-    if (data.origin !== 'Compra' && data.origin !== 'Donación' && data.lotNumber && data.purchaseDate && data.expirationDate) {
+    // Siempre incluir el lote si está disponible — el backend valida
+    // la unicidad del par código+lote y gestiona la creación/actualización.
+    if (data.lotNumber && data.purchaseDate && data.expirationDate) {
       payload.lots = [{
         lot_number: data.lotNumber,
         purchase_date: data.purchaseDate,
@@ -110,6 +111,7 @@ class InventoryService {
     );
     return mapToProduct(response.data);
   }
+
 
   async update(id: number, data: Partial<ProductCreate>): Promise<Product> {
     const payload: any = {};

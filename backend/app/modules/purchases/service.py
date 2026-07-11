@@ -30,6 +30,23 @@ class PurchaseService:
         if data.expiry_date <= date.today():
             raise HTTPException(status_code=400, detail="La fecha de vencimiento debe ser futura")
 
+        from sqlalchemy import func
+        # Verificar que no exista ya un lote activo con el mismo número para este producto
+        existing_lot = (
+            db.query(ProductLot)
+            .filter(
+                ProductLot.product_id == data.product_id,
+                func.lower(ProductLot.lot_number) == func.lower(data.lot_number),
+                ProductLot.is_active == True,
+            )
+            .first()
+        )
+        if existing_lot:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Ya existe el lote '{data.lot_number}' para este producto. El par código-lote debe ser único."
+            )
+
         total_amount = round(data.quantity * data.unit_price, 2)
 
         purchase = Purchase(

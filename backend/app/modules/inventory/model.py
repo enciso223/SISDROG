@@ -18,7 +18,7 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, index=True)
-    code = Column(String, unique=True, nullable=False, index=True)
+    code = Column(String, unique=False, nullable=False, index=True)
     name = Column(String, nullable=False, index=True)
     description = Column(Text, nullable=True)
     presentation = Column(String, nullable=True)

@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from fastapi import HTTPException, status
 from datetime import date
 
@@ -43,11 +44,7 @@ class ProductLotService:
         if not product or not product.is_active:
             raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-        if data.expiry_date <= date.today():
-            raise HTTPException(
-                status_code=400,
-                detail="La fecha de vencimiento debe ser futura"
-            )
+        # Se permite fecha de vencimiento pasada porque el frontend gestiona la confirmación explícita.
 
         lot = ProductLot(
             product_id=product_id,
@@ -92,42 +89,70 @@ class ProductService:
             raise HTTPException(status_code=404, detail="Producto no encontrado")
         return product
 
-    def get_by_code(self, db: Session, code: str):
-        product = self.repo.get_by_code(db, code)
-        if not product:
-            raise HTTPException(status_code=404, detail="Producto no encontrado con ese código")
-        return product
+    def get_all_by_code(self, db: Session, code: str):
+        products = self.repo.get_all_by_code(db, code)
+        if not products:
+            raise HTTPException(status_code=404, detail="Productos no encontrados con ese código")
+        return products
 
     def search(self, db: Session, query: str):
         return self.repo.search(db, query)
 
     def create(self, db: Session, data: ProductCreate):
-        existing = self.repo.get_by_code(db, data.code)
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Ya existe un producto con el código '{data.code}'"
-            )
-
+        existing_products = self.repo.get_all_by_code(db, data.code)
+        
         lots_data = data.lots
+        
+        # Verificar si algún producto existente con este código tiene un lote conflictivo
+        if existing_products and lots_data:
+            for p in existing_products:
+                for lot_data in lots_data:
+                    dup_lot = (
+                        db.query(ProductLot)
+                        .filter(
+                            ProductLot.product_id == p.id,
+                            func.lower(ProductLot.lot_number) == func.lower(lot_data.lot_number),
+                        )
+                        .first()
+                    )
+                    if dup_lot:
+                        if dup_lot.is_active and p.is_active:
+                            raise HTTPException(
+                                status_code=status.HTTP_409_CONFLICT,
+                                detail=(
+                                    f"Ya existe el lote '{lot_data.lot_number}' para el producto "
+                                    f"con código '{data.code}'. El par código-lote debe ser único."
+                                ),
+                            )
+                        else:
+                            # Reactivar este producto y lote específicamente
+                            update_data = data.model_dump(exclude={"lots"})
+                            for field, value in update_data.items():
+                                setattr(p, field, value)
+                            p.is_active = True
+                            dup_lot.is_active = True
+                            dup_lot.stock = lot_data.stock
+                            
+                            dup_lot.expiry_date = lot_data.expiry_date
+                            
+                            p.stock = sum(l.stock for l in p.lots if l.is_active)
+                            db.commit()
+                            db.refresh(p)
+                            return p
+
+        # Si llegamos aquí, no hay colisión (o es un nuevo lote para este código)
+        # Por requerimiento, creamos un nuevo registro de Producto independiente.
         product_data = data.model_dump(exclude={"lots"})
         product = Product(**product_data)
 
         if lots_data:
-            total_lot_stock = sum(l.stock for l in lots_data)
-            product.stock = total_lot_stock
-        
+            product.stock = sum(l.stock for l in lots_data)
+
         db.add(product)
         db.flush()
 
         if lots_data:
             for lot_data in lots_data:
-                if lot_data.expiry_date <= date.today():
-                    db.rollback()
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"El lote '{lot_data.lot_number}' tiene fecha de vencimiento pasada o de hoy"
-                    )
                 lot = ProductLot(product_id=product.id, **lot_data.model_dump())
                 db.add(lot)
 

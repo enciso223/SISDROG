@@ -5,7 +5,8 @@
  */
 
 import {useState, useCallback} from 'react';
-import {inventoryService, mockProducts, mockAlerts, donationsService, purchasesService} from '../services';
+import {inventoryService, mockProducts, mockAlerts} from '../services';
+
 import {Product, ProductCreate, InventoryAlertsResponse} from '../models';
 import {DEMO_MODE} from '../config/constants';
 
@@ -88,7 +89,6 @@ export const useInventoryController = (): UseInventoryControllerReturn => {
   const createProduct = useCallback(
     async (data: ProductCreate): Promise<void> => {
       setLoading(true);
-      setError(null);
       try {
         if (DEMO_MODE) {
           const newProduct: Product = {
@@ -99,48 +99,12 @@ export const useInventoryController = (): UseInventoryControllerReturn => {
           };
           setProducts(prev => [...prev, newProduct]);
         } else {
-          const isDonation = data.origin === 'Donación';
-          const isPurchase = data.origin === 'Compra';
-          const originalStock = data.stock;
-
-          // Si es donación o compra, registramos el producto con 0 de stock inicial
-          // para no duplicar el inventario; el lote se creará/actualizará mediante
-          // el servicio respectivo (donación o compra).
-          if ((isDonation || isPurchase) && originalStock > 0) {
-            data = {...data, stock: 0};
-          }
-
+          // El backend gestiona atómicamente la validación de par código+lote.
+          // Si el código ya existe pero el lote es nuevo, devuelve un producto nuevo independiente.
           const newProduct = await inventoryService.create(data);
-
-          if (originalStock > 0 && newProduct.id) {
-            if (isDonation) {
-              await donationsService.create({
-                donationType: 'received',
-                items: [{ productId: newProduct.id, quantity: originalStock }],
-                notes: 'Donación recibida al registrar nuevo producto',
-              });
-              newProduct.stock = originalStock;
-            } else if (isPurchase) {
-              // Registrar la compra — esto actualiza el stock y crea el lote en BD
-              await purchasesService.create({
-                productId: newProduct.id,
-                purchaseDate: data.purchaseDate || new Date().toISOString().split('T')[0],
-                quantity: originalStock,
-                unitPrice: data.purchasePrice || 0,
-                lotNumber: data.lotNumber || 'N/A',
-                expiryDate: data.expirationDate || '2099-12-31',
-                notes: 'Compra inicial al registrar nuevo producto',
-              });
-              newProduct.stock = originalStock;
-            }
-          }
-
           setProducts(prev => [...prev, newProduct]);
         }
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'Error al crear producto',
-        );
         throw err;
       } finally {
         setLoading(false);
@@ -148,6 +112,7 @@ export const useInventoryController = (): UseInventoryControllerReturn => {
     },
     [],
   );
+
 
   /* ─── Update Product ─── */
   const updateProduct = useCallback(
@@ -164,9 +129,6 @@ export const useInventoryController = (): UseInventoryControllerReturn => {
           setProducts(prev => prev.map(p => (p.id === id ? updated : p)));
         }
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'Error al actualizar producto',
-        );
         throw err;
       } finally {
         setLoading(false);
@@ -187,9 +149,6 @@ export const useInventoryController = (): UseInventoryControllerReturn => {
         setProducts(prev => prev.filter(p => p.id !== id));
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Error al eliminar producto',
-      );
       throw err;
     } finally {
       setLoading(false);

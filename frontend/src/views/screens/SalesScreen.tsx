@@ -34,6 +34,16 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────
+const isProductExpired = (dateStr?: string) => {
+  if (!dateStr) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  const target = new Date(`${cleanDate}T00:00:00`);
+  target.setHours(0, 0, 0, 0);
+  return target < today;
+};
 
 // ─── Componentes Secundarios ──────────────────────────────────────
 
@@ -337,8 +347,24 @@ export const SalesScreen: React.FC = () => {
 
   // Wrappers con animación
   const addToCart = (p: Product) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    _addToCart(p);
+    const doAdd = () => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      _addToCart(p);
+    };
+
+    if (isProductExpired(p.expirationDate)) {
+      Alert.alert(
+        'Producto Vencido',
+        'Este producto se encuentra vencido y es recomendable no venderlo. ¿Estás seguro de que deseas agregarlo al carrito de ventas?',
+        [
+          {text: 'Cancelar', style: 'cancel'},
+          {text: 'Sí, agregar', style: 'destructive', onPress: doAdd},
+        ],
+      );
+      return;
+    }
+
+    doAdd();
   };
   const removeFromCart = (id: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);

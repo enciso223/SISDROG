@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  Alert,
 } from 'react-native';
 import {Input} from './Input';
 import {Icon, IconName} from './Icon';
@@ -234,7 +235,56 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
   const handleSave = () => {
     if (validate()) {
-      onSave(formData as ProductCreate, product?.id);
+      let isExpired = false;
+      let hasNegativeMargin = false;
+
+      // Validación de caducidad
+      if (formData.expirationDate) {
+        const expDate = new Date(`${formData.expirationDate}T00:00:00`);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (expDate <= today) {
+          isExpired = true;
+        }
+      }
+
+      // Validación de precio de venta vs compra (solo si no es donación)
+      if (
+        formData.origin !== 'Donación' &&
+        formData.purchasePrice !== undefined &&
+        formData.salePrice !== undefined &&
+        formData.salePrice < formData.purchasePrice
+      ) {
+        hasNegativeMargin = true;
+      }
+
+      const proceedToSave = () => {
+        onSave(formData as ProductCreate, product?.id);
+      };
+
+      if (isExpired || hasNegativeMargin) {
+        let title = 'Advertencia';
+        let message = '';
+
+        if (isExpired && hasNegativeMargin) {
+          title = 'Múltiples Advertencias';
+          message = 'El producto está vencido (o vence hoy) Y el precio de venta es menor al precio de compra, lo que generará pérdidas.\n\n¿Está seguro que desea registrarlo de todas formas?';
+        } else if (isExpired) {
+          title = 'Producto Vencido';
+          message = 'La fecha de vencimiento ingresada indica que el producto ya está vencido o vence hoy.\n\n¿Está seguro que desea registrarlo?';
+        } else if (hasNegativeMargin) {
+          title = 'Inconsistencia de Precios';
+          message = 'El precio de venta ingresado es menor al precio de compra. Esto generará pérdidas.\n\n¿Está seguro que desea registrarlo?';
+        }
+
+        Alert.alert(title, message, [
+          {text: 'Cancelar', style: 'cancel'},
+          {text: 'Sí, registrar', style: 'destructive', onPress: proceedToSave},
+        ]);
+        return;
+      }
+
+      proceedToSave();
     }
   };
 
