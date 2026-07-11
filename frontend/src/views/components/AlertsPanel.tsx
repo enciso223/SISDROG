@@ -42,12 +42,16 @@ const TEAL = '#0D9488';
 
 /* ─── Helpers ─── */
 
-/** Calcula los días restantes hasta una fecha. */
+/** Calcula los días restantes hasta una fecha asegurando zona horaria local. */
 function daysUntil(dateStr: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr);
+  
+  // Extraemos YYYY-MM-DD y forzamos hora local añadiendo T00:00:00
+  const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  const target = new Date(`${cleanDate}T00:00:00`);
   target.setHours(0, 0, 0, 0);
+  
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
