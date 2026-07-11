@@ -41,6 +41,8 @@ class ExpensesService {
     if (filters.dateTo) {
       params.date_to = filters.dateTo;
     }
+    // Añadimos un límite alto para poder ver hasta 5000 registros en la FlatList
+    params.limit = '5000';
     const response = await apiClient.get<ExpenseBackend[]>('/expenses', {
       params,
     });

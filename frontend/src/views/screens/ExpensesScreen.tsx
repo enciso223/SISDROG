@@ -16,6 +16,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  FlatList,
 } from 'react-native';
 import {useExpensesController} from '../../controllers';
 import {Input, Icon} from '../components';
@@ -75,10 +76,37 @@ const formatCurrency = (amount: number | undefined) => {
   if (amount == null) {
     return '$0';
   }
-  const intPart = Math.floor(amount)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const parts = amount.toString().split('.');
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  if (parts.length > 1) {
+    const decPart = parts[1].padEnd(2, '0').slice(0, 2);
+    return `$${intPart},${decPart}`;
+  }
   return `$${intPart}`;
+};
+
+const formatInputCurrency = (raw: string) => {
+  let cleaned = raw.replace(/\./g, '');
+  cleaned = cleaned.replace(/[^0-9,]/g, '');
+  
+  const parts = cleaned.split(',');
+  if (parts.length > 2) {
+    parts[1] = parts.slice(1).join('');
+    parts.length = 2;
+  }
+  
+  let intPart = parts[0];
+  if (intPart !== '') {
+    const parsed = parseInt(intPart, 10);
+    intPart = Number.isNaN(parsed) ? '' : parsed.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  } else if (cleaned.startsWith(',')) {
+    intPart = '0';
+  }
+  
+  if (parts.length > 1) {
+    return `${intPart},${parts[1]}`;
+  }
+  return intPart;
 };
 
 export const ExpensesScreen: React.FC = () => {
@@ -121,7 +149,8 @@ export const ExpensesScreen: React.FC = () => {
 
   const validate = (): {ok: boolean; iso: string; amount: number} => {
     const newErrors: Record<string, string> = {};
-    const amount = parseFloat(amountInput);
+    const rawAmount = amountInput.replace(/\./g, '').replace(/,/g, '.');
+    const amount = parseFloat(rawAmount);
     if (!amountInput || Number.isNaN(amount) || amount <= 0) {
       newErrors.amount = 'Ingresa un valor mayor a 0';
     }
@@ -182,214 +211,234 @@ export const ExpensesScreen: React.FC = () => {
 
   const hasActiveFilter = !!dateFrom || !!dateTo;
 
-  return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-        {/* ── Banner de error general ── */}
-        {error && error !== 'El rango de fechas no es válido' && (
+  const renderListHeader = () => (
+    <View>
+      {/* ── Banner de error general ── */}
+      {error && error !== 'El rango de fechas no es válido' && (
+        <View style={styles.errorBanner}>
+          <Icon name="warning" size={16} color={DANGER} />
+          <Text style={styles.errorBannerText}>{error}</Text>
+        </View>
+      )}
+
+      {/* ── Registrar gasto ── */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIconBadge}>
+            <Icon name="money" size={16} color={TEAL} />
+          </View>
+          <View style={{flex: 1}}>
+            <Text style={styles.cardTitle}>Registrar gasto</Text>
+            <Text style={styles.cardSubtitle}>
+              Ingresa el valor, el motivo y la fecha del gasto
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.formRow}>
+          <View style={styles.formColSmall}>
+            <Input
+              label="Valor *"
+              placeholder="0"
+              keyboardType="numeric"
+              value={amountInput}
+              onChangeText={v => {
+                setAmountInput(formatInputCurrency(v));
+                if (formErrors.amount) {
+                  setFormErrors(prev => ({...prev, amount: ''}));
+                }
+              }}
+              error={formErrors.amount}
+            />
+          </View>
+          <View style={styles.formColSmall}>
+            <Input
+              label="Fecha *"
+              placeholder="DD/MM/AAAA"
+              keyboardType="numeric"
+              value={dateDisplay}
+              onChangeText={handleDateChange}
+              maxLength={10}
+              error={formErrors.date}
+            />
+          </View>
+        </View>
+
+        <Input
+          label="Motivo *"
+          placeholder="Ej. Pago de arriendo, servicios, transporte..."
+          value={reasonInput}
+          onChangeText={v => {
+            setReasonInput(v);
+            if (formErrors.reason) {
+              setFormErrors(prev => ({...prev, reason: ''}));
+            }
+          }}
+          error={formErrors.reason}
+        />
+
+        <TouchableOpacity
+          style={[styles.primaryButton, saving && styles.buttonDisabled]}
+          onPress={handleRegister}
+          disabled={saving}
+          activeOpacity={0.9}>
+          {saving ? (
+            <ActivityIndicator color={BG_SURFACE} size="small" />
+          ) : (
+            <>
+              <Icon name="save" size={14} color={BG_SURFACE} />
+              <Text style={styles.primaryButtonText}>Registrar gasto</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Filtro por rango de fechas ── */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardIconBadge}>
+            <Icon name="calendar" size={16} color={TEAL} />
+          </View>
+          <View style={{flex: 1}}>
+            <Text style={styles.cardTitle}>Filtrar por fechas</Text>
+            <Text style={styles.cardSubtitle}>
+              Consulta los gastos dentro de un rango de fechas
+            </Text>
+          </View>
+        </View>
+
+        {/* ── Banner de error específico de filtro ── */}
+        {filterError && (
           <View style={styles.errorBanner}>
             <Icon name="warning" size={16} color={DANGER} />
-            <Text style={styles.errorBannerText}>{error}</Text>
+            <Text style={styles.errorBannerText}>{filterError}</Text>
           </View>
         )}
 
-        {/* ── Registrar gasto ── */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardIconBadge}>
-              <Icon name="money" size={16} color={TEAL} />
-            </View>
-            <View style={{flex: 1}}>
-              <Text style={styles.cardTitle}>Registrar gasto</Text>
-              <Text style={styles.cardSubtitle}>
-                Ingresa el valor, el motivo y la fecha del gasto
-              </Text>
-            </View>
+        <View style={styles.formRow}>
+          <View style={styles.formColSmall}>
+            <Input
+              label="Desde"
+              placeholder="DD/MM/AAAA"
+              keyboardType="numeric"
+              value={fromDisplay}
+              onChangeText={v => setFromDisplay(maskDate(v))}
+              maxLength={10}
+            />
           </View>
-
-          <View style={styles.formRow}>
-            <View style={styles.formColSmall}>
-              <Input
-                label="Valor *"
-                placeholder="0"
-                keyboardType="numeric"
-                value={amountInput}
-                onChangeText={v => {
-                  setAmountInput(v.replace(/[^0-9.]/g, ''));
-                  if (formErrors.amount) {
-                    setFormErrors(prev => ({...prev, amount: ''}));
-                  }
-                }}
-                error={formErrors.amount}
-              />
-            </View>
-            <View style={styles.formColSmall}>
-              <Input
-                label="Fecha *"
-                placeholder="DD/MM/AAAA"
-                keyboardType="numeric"
-                value={dateDisplay}
-                onChangeText={handleDateChange}
-                maxLength={10}
-                error={formErrors.date}
-              />
-            </View>
+          <View style={styles.formColSmall}>
+            <Input
+              label="Hasta"
+              placeholder="DD/MM/AAAA"
+              keyboardType="numeric"
+              value={toDisplay}
+              onChangeText={v => setToDisplay(maskDate(v))}
+              maxLength={10}
+            />
           </View>
+        </View>
 
-          <Input
-            label="Motivo *"
-            placeholder="Ej. Pago de arriendo, servicios, transporte..."
-            value={reasonInput}
-            onChangeText={v => {
-              setReasonInput(v);
-              if (formErrors.reason) {
-                setFormErrors(prev => ({...prev, reason: ''}));
-              }
-            }}
-            error={formErrors.reason}
-          />
-
+        <View style={styles.filterActions}>
           <TouchableOpacity
-            style={[styles.primaryButton, saving && styles.buttonDisabled]}
-            onPress={handleRegister}
-            disabled={saving}
+            style={styles.secondaryButton}
+            onPress={handleClearFilters}
+            activeOpacity={0.8}>
+            <Text style={styles.secondaryButtonText}>Limpiar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.primaryButtonInline}
+            onPress={applyFilters}
             activeOpacity={0.9}>
-            {saving ? (
-              <ActivityIndicator color={BG_SURFACE} size="small" />
-            ) : (
-              <>
-                <Icon name="save" size={14} color={BG_SURFACE} />
-                <Text style={styles.primaryButtonText}>Registrar gasto</Text>
-              </>
-            )}
+            <Icon name="search" size={14} color={BG_SURFACE} />
+            <Text style={styles.primaryButtonText}>Aplicar</Text>
           </TouchableOpacity>
         </View>
+      </View>
 
-        {/* ── Filtro por rango de fechas ── */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardIconBadge}>
-              <Icon name="calendar" size={16} color={TEAL} />
-            </View>
-            <View style={{flex: 1}}>
-              <Text style={styles.cardTitle}>Filtrar por fechas</Text>
-              <Text style={styles.cardSubtitle}>
-                Consulta los gastos dentro de un rango de fechas
-              </Text>
-            </View>
-          </View>
-
-          {/* ── Banner de error específico de filtro ── */}
-          {filterError && (
-            <View style={styles.errorBanner}>
-              <Icon name="warning" size={16} color={DANGER} />
-              <Text style={styles.errorBannerText}>{filterError}</Text>
-            </View>
-          )}
-
-          <View style={styles.formRow}>
-            <View style={styles.formColSmall}>
-              <Input
-                label="Desde"
-                placeholder="DD/MM/AAAA"
-                keyboardType="numeric"
-                value={fromDisplay}
-                onChangeText={v => setFromDisplay(maskDate(v))}
-                maxLength={10}
-              />
-            </View>
-            <View style={styles.formColSmall}>
-              <Input
-                label="Hasta"
-                placeholder="DD/MM/AAAA"
-                keyboardType="numeric"
-                value={toDisplay}
-                onChangeText={v => setToDisplay(maskDate(v))}
-                maxLength={10}
-              />
-            </View>
-          </View>
-
-          <View style={styles.filterActions}>
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleClearFilters}
-              activeOpacity={0.8}>
-              <Text style={styles.secondaryButtonText}>Limpiar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.primaryButtonInline}
-              onPress={applyFilters}
-              activeOpacity={0.9}>
-              <Icon name="search" size={14} color={BG_SURFACE} />
-              <Text style={styles.primaryButtonText}>Aplicar</Text>
-            </TouchableOpacity>
+      {/* ── Header de Lista de gastos ── */}
+      <View style={[styles.card, { marginBottom: 0, borderBottomWidth: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 0 }]}>
+        <View style={styles.listHeader}>
+          <Text style={styles.cardTitle}>Gastos registrados</Text>
+          <View style={styles.totalPill}>
+            <Text style={styles.totalPillLabel}>Total</Text>
+            <Text style={styles.totalPillValue}>{formatCurrency(total)}</Text>
           </View>
         </View>
 
-        {/* ── Lista de gastos ── */}
-        <View style={styles.card}>
-          <View style={styles.listHeader}>
-            <Text style={styles.cardTitle}>Gastos registrados</Text>
-            <View style={styles.totalPill}>
-              <Text style={styles.totalPillLabel}>Total</Text>
-              <Text style={styles.totalPillValue}>{formatCurrency(total)}</Text>
-            </View>
-          </View>
+        {hasActiveFilter && (
+          <Text style={styles.filterInfo}>
+            Filtro:{' '}
+            {dateFrom ? `desde ${ISOToDisplay(dateFrom)}` : 'sin inicio'}{' '}
+            {dateTo ? `hasta ${ISOToDisplay(dateTo)}` : 'sin fin'}
+          </Text>
+        )}
 
-          {hasActiveFilter && (
-            <Text style={styles.filterInfo}>
-              Filtro:{' '}
-              {dateFrom ? `desde ${ISOToDisplay(dateFrom)}` : 'sin inicio'}{' '}
-              {dateTo ? `hasta ${ISOToDisplay(dateTo)}` : 'sin fin'}
-            </Text>
-          )}
-
-          {/* Encabezado de tabla */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.thText, {flex: 2}]}>FECHA</Text>
-            <Text style={[styles.thText, {flex: 5}]}>MOTIVO</Text>
-            <Text style={[styles.thText, {flex: 3, textAlign: 'right'}]}>
-              VALOR
-            </Text>
-          </View>
-
-          {loading ? (
-            <ActivityIndicator
-              size="large"
-              color={TEAL}
-              style={{marginVertical: 32}}
-            />
-          ) : expenses.length === 0 ? (
-            // Mensaje informativo cuando no hay resultados
-            <View style={styles.emptyState}>
-              <Icon name="info" size={40} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No hay gastos para mostrar</Text>
-              <Text style={styles.emptySubtitle}>
-                {hasActiveFilter
-                  ? 'No se encontraron gastos en el rango de fechas seleccionado.'
-                  : 'Registra tu primer gasto usando el formulario de arriba.'}
-              </Text>
-            </View>
-          ) : (
-            expenses.map(expense => (
-              <View key={expense.id ?? expense.reason} style={styles.tableRow}>
-                <Text style={[styles.tdDate, {flex: 2}]}>
-                  {ISOToDisplay(expense.expenseDate)}
-                </Text>
-                <Text style={[styles.tdReason, {flex: 5}]} numberOfLines={2}>
-                  {expense.reason}
-                </Text>
-                <Text style={[styles.tdAmount, {flex: 3}]}>
-                  {formatCurrency(expense.amount)}
-                </Text>
-              </View>
-            ))
-          )}
+        <View style={styles.tableHeader}>
+          <Text style={[styles.thText, {flex: 2}]}>FECHA</Text>
+          <Text style={[styles.thText, {flex: 5}]}>MOTIVO</Text>
+          <Text style={[styles.thText, {flex: 3, textAlign: 'right'}]}>
+            VALOR
+          </Text>
         </View>
-      </ScrollView>
+
+        {loading && (
+          <ActivityIndicator size="large" color={TEAL} style={{marginVertical: 32}} />
+        )}
+        {!loading && expenses.length === 0 && (
+          <View style={styles.emptyState}>
+            <Icon name="info" size={40} color="#CBD5E1" />
+            <Text style={styles.emptyTitle}>No hay gastos para mostrar</Text>
+            <Text style={styles.emptySubtitle}>
+              {hasActiveFilter
+                ? 'No se encontraron gastos en el rango de fechas seleccionado.'
+                : 'Registra tu primer gasto usando el formulario de arriba.'}
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+
+  const renderItem = ({item}: {item: any}) => (
+    <View style={{
+      backgroundColor: BG_SURFACE,
+      paddingHorizontal: 20,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderColor: BORDER,
+    }}>
+      <View style={styles.tableRow}>
+        <Text style={[styles.tdDate, {flex: 2}]}>
+          {ISOToDisplay(item.expenseDate)}
+        </Text>
+        <Text style={[styles.tdReason, {flex: 5}]} numberOfLines={2}>
+          {item.reason}
+        </Text>
+        <Text style={[styles.tdAmount, {flex: 3}]}>
+          {formatCurrency(item.amount)}
+        </Text>
+      </View>
+    </View>
+  );
+
+  const renderListFooter = () => (
+    <View style={[styles.card, { marginTop: 0, borderTopWidth: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, paddingTop: 20 }]} />
+  );
+
+  return (
+    <View style={styles.container}>
+      <FlatList
+        data={!loading && expenses.length > 0 ? expenses : []}
+        keyExtractor={item => (item.id ?? item.reason).toString()}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+        ListHeaderComponent={renderListHeader()}
+        renderItem={renderItem}
+        ListFooterComponent={renderListFooter()}
+        initialNumToRender={15}
+        maxToRenderPerBatch={20}
+        windowSize={11}
+      />
     </View>
   );
 };
